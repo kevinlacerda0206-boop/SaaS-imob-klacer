@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { COLORS } from "@/lib/colors";
-import { AuthShell, authInputStyle, authButtonStyle } from "@/components/AuthShell";
+import { AuthShell, useAuthStyles } from "@/components/AuthShell";
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { colors: COLORS, authInputStyle, authButtonStyle } = useAuthStyles();
   const [name, setName] = useState("");
   const [role, setRole] = useState<"corretor" | "gestor">("corretor");
   const [teamName, setTeamName] = useState("");
@@ -53,8 +53,8 @@ export default function OnboardingPage() {
         <code
           style={{
             display: "block",
-            background: COLORS.emeraldSoft,
-            color: COLORS.emerald,
+            background: COLORS.accentSoft,
+            color: COLORS.accent,
             padding: "10px 12px",
             borderRadius: 6,
             fontSize: 13,
@@ -95,8 +95,8 @@ export default function OnboardingPage() {
             style={{
               ...authButtonStyle,
               flex: 1,
-              background: role === "corretor" ? COLORS.emerald : COLORS.emeraldSoft,
-              color: role === "corretor" ? "#fff" : COLORS.emerald,
+              background: role === "corretor" ? COLORS.accent : COLORS.accentSoft,
+              color: role === "corretor" ? COLORS.onAccent : COLORS.accent,
             }}
           >
             Corretor
@@ -107,8 +107,8 @@ export default function OnboardingPage() {
             style={{
               ...authButtonStyle,
               flex: 1,
-              background: role === "gestor" ? COLORS.emerald : COLORS.emeraldSoft,
-              color: role === "gestor" ? "#fff" : COLORS.emerald,
+              background: role === "gestor" ? COLORS.accent : COLORS.accentSoft,
+              color: role === "gestor" ? COLORS.onAccent : COLORS.accent,
             }}
           >
             Gestor

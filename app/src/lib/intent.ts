@@ -14,6 +14,10 @@ export function fmtDate(ts: number): string {
   return new Date(ts).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
 
+export function fmtTime(ts: number): string {
+  return new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
 export function daysFromNow(n: number): number {
   return Date.now() + n * 86400000;
 }

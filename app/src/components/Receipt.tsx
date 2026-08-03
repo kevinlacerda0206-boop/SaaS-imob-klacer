@@ -2,33 +2,12 @@
 
 import { useState } from "react";
 import { Check, Pencil, X } from "lucide-react";
-import { COLORS, CADENCE_DAYS } from "@/lib/colors";
+import { CADENCE_DAYS } from "@/lib/colors";
 import { fmtDate, daysFromNow } from "@/lib/intent";
+import { useTheme } from "@/lib/theme";
 import type { Lead, WriteDraft, ConfirmPayload } from "@/lib/types";
 import { TagChip } from "./TagChip";
 import { Row } from "./Row";
-
-const inputStyle = {
-  border: `1px solid ${COLORS.border}`,
-  borderRadius: 4,
-  padding: "5px 8px",
-  fontSize: 14,
-  fontFamily: "'Inter', sans-serif",
-  outline: "none",
-};
-
-const btnBase = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 6,
-  padding: "9px 14px",
-  borderRadius: 4,
-  border: "none",
-  fontSize: 13,
-  fontWeight: 600,
-  fontFamily: "'Inter', sans-serif",
-};
 
 export function Receipt({
   draft,
@@ -41,6 +20,31 @@ export function Receipt({
   onConfirm: (payload: ConfirmPayload) => void;
   onCancel: () => void;
 }) {
+  const { colors: COLORS } = useTheme();
+  const inputStyle = {
+    border: `1px solid ${COLORS.border}`,
+    borderRadius: 4,
+    padding: "5px 8px",
+    fontSize: 14,
+    fontFamily: "'Archivo', sans-serif",
+    outline: "none",
+    background: COLORS.panel,
+    color: COLORS.ink,
+  };
+
+  const btnBase = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    padding: "9px 14px",
+    borderRadius: 4,
+    border: "none",
+    fontSize: 13,
+    fontWeight: 600,
+    fontFamily: "'Archivo', sans-serif",
+  };
+
   const lead = leads.find((l) => l.id === draft.matched_lead_id);
   const [editing, setEditing] = useState(false);
   const [noteText, setNoteText] = useState(draft.note_text || "");
@@ -53,12 +57,12 @@ export function Receipt({
     setAddTags((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
 
   return (
-    <div style={{ background: COLORS.panel, border: `1px dashed ${COLORS.brass}`, borderRadius: 4, padding: "18px 18px 14px" }}>
+    <div style={{ background: COLORS.panel, border: `1px dashed ${COLORS.accent}`, borderRadius: 4, padding: "18px 18px 14px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: 1, color: COLORS.brass, textTransform: "uppercase" }}>
+        <span style={{ fontFamily: "'Roboto Mono', monospace", fontSize: 11, letterSpacing: 1, color: COLORS.accent, textTransform: "uppercase" }}>
           Confirmar registro
         </span>
-        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: COLORS.muted }}>
+        <span style={{ fontFamily: "'Roboto Mono', monospace", fontSize: 11, color: COLORS.muted }}>
           {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
         </span>
       </div>
@@ -81,7 +85,7 @@ export function Receipt({
             <textarea
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
-              style={{ ...inputStyle, width: "100%", minHeight: 50, fontFamily: "'Inter', sans-serif", resize: "vertical" }}
+              style={{ ...inputStyle, width: "100%", minHeight: 50, fontFamily: "'Archivo', sans-serif", resize: "vertical" }}
             />
           ) : (
             <span>{noteText}</span>
@@ -92,7 +96,7 @@ export function Receipt({
           <Row label="Etiquetas">
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {addTags.map((t) => (
-                <TagChip key={t} label={`+ ${t}`} tone="emerald" onClick={editing ? () => toggleTag(t) : undefined} />
+                <TagChip key={t} label={`+ ${t}`} tone="accent" onClick={editing ? () => toggleTag(t) : undefined} />
               ))}
               {(draft.tags_to_remove || []).map((t) => (
                 <TagChip key={t} label={`− ${t}`} tone="urgent" />
@@ -175,11 +179,11 @@ export function Receipt({
               visit: draft.visit,
             })
           }
-          style={{ ...btnBase, background: lead ? COLORS.emerald : COLORS.border, color: lead ? "#fff" : COLORS.muted, cursor: lead ? "pointer" : "not-allowed", flex: 1 }}
+          style={{ ...btnBase, background: lead ? COLORS.accent : COLORS.border, color: lead ? COLORS.onAccent : COLORS.muted, cursor: lead ? "pointer" : "not-allowed", flex: 1 }}
         >
           <Check size={15} /> Confirmar
         </button>
-        <button onClick={() => setEditing((v) => !v)} style={{ ...btnBase, background: COLORS.brassSoft, color: COLORS.ink }}>
+        <button onClick={() => setEditing((v) => !v)} style={{ ...btnBase, background: COLORS.accentSoft, color: COLORS.ink }}>
           <Pencil size={15} /> {editing ? "Ok" : "Editar"}
         </button>
         <button onClick={onCancel} style={{ ...btnBase, background: "transparent", color: COLORS.muted, border: `1px solid ${COLORS.border}` }}>

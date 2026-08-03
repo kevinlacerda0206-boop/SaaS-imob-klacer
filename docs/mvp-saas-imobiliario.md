@@ -8,7 +8,7 @@ Se o corretor conseguir atualizar o CRM inteiro conversando (por voz ou texto) e
 Tudo no MVP existe para provar (ou derrubar) essa hipótese o mais rápido possível — não para entregar o produto completo desenhado no brainstorm (esse produto completo inclui, mais pra frente: integração com WhatsApp, hierarquia até construtora, módulo financeiro de comissões — nada disso entra agora).
 
 ## Público do MVP
-Equipe pequena de corretores de alto padrão (o ambiente ideal de teste é a própria equipe do usuário). Um só nível hierárquico por enquanto: corretor + um gestor observando o time.
+Corretor de imóveis em geral — qualquer nicho do mercado imobiliário (residencial, comercial, rural, locação, lançamento etc.), não só alto padrão. Foco do produto é o corretor individual e o dia a dia dele; funcionalidades de gestor/diretor/construtora ficam pra depois. Equipe pequena como ambiente ideal de teste inicial (o ambiente ideal de teste é a própria equipe do usuário), com um só nível hierárquico por enquanto: corretor + um gestor observando o time.
 
 ---
 

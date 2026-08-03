@@ -28,6 +28,7 @@ export interface ChatMessage {
   id: string;
   role: "user" | "system";
   text: string;
+  time: string;
 }
 
 export interface Visit {

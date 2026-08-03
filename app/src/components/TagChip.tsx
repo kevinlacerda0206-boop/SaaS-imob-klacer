@@ -1,10 +1,10 @@
-import { COLORS } from "@/lib/colors";
+import { useTheme } from "@/lib/theme";
 
-type Tone = "brass" | "emerald" | "urgent";
+type Tone = "accent" | "urgent";
 
 export function TagChip({
   label,
-  tone = "brass",
+  tone = "accent",
   onClick,
   active = true,
 }: {
@@ -13,9 +13,9 @@ export function TagChip({
   onClick?: () => void;
   active?: boolean;
 }) {
+  const { colors: COLORS } = useTheme();
   const palette: Record<Tone, { bg: string; fg: string }> = {
-    brass: { bg: COLORS.brassSoft, fg: "#7A5F35" },
-    emerald: { bg: COLORS.emeraldSoft, fg: COLORS.emerald },
+    accent: { bg: COLORS.accentSoft, fg: COLORS.accent },
     urgent: { bg: COLORS.urgentSoft, fg: COLORS.urgent },
   };
   const p = palette[tone];
@@ -27,9 +27,9 @@ export function TagChip({
         alignItems: "center",
         gap: 4,
         fontSize: 11,
-        fontFamily: "'IBM Plex Mono', monospace",
+        fontFamily: "'Roboto Mono', monospace",
         padding: "3px 8px",
-        borderRadius: 20,
+        borderRadius: 4,
         background: active ? p.bg : "transparent",
         color: active ? p.fg : COLORS.muted,
         border: active ? "none" : `1px dashed ${COLORS.border}`,

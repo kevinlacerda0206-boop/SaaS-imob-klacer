@@ -4,11 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { COLORS } from "@/lib/colors";
-import { AuthShell, authInputStyle, authButtonStyle } from "@/components/AuthShell";
+import { AuthShell, useAuthStyles } from "@/components/AuthShell";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { colors: COLORS, authInputStyle, authButtonStyle } = useAuthStyles();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -54,7 +54,7 @@ export default function LoginPage() {
         </button>
       </form>
       <p style={{ fontSize: 13, color: COLORS.muted, marginTop: 16, textAlign: "center" }}>
-        Ainda não tem conta? <Link href="/signup" style={{ color: COLORS.emerald, fontWeight: 600 }}>Criar conta</Link>
+        Ainda não tem conta? <Link href="/signup" style={{ color: COLORS.accent, fontWeight: 600 }}>Criar conta</Link>
       </p>
     </AuthShell>
   );

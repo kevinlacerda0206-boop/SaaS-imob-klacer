@@ -1,36 +1,16 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Mic, Send, Check, Clock, LayoutGrid, MessageCircle, ChevronRight, Building2 } from "lucide-react";
-import { COLORS, STAGES, CADENCE_DAYS } from "@/lib/colors";
-import { uid, fmtDate, daysFromNow, extractIntent, buildAnswer } from "@/lib/intent";
+import { Mic, Send, Check, Clock, LayoutGrid, MessageCircle, ChevronRight } from "lucide-react";
+import { STAGES, CADENCE_DAYS } from "@/lib/colors";
+import { uid, fmtDate, fmtTime, daysFromNow, extractIntent, buildAnswer } from "@/lib/intent";
 import type { Lead, Note, Reminder, ChatMessage, WriteDraft, ConfirmPayload } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { leadFromRow, noteFromRow, reminderFromRow } from "@/lib/supabase/mappers";
+import { useTheme } from "@/lib/theme";
 import { TagChip } from "./TagChip";
 import { Receipt } from "./Receipt";
-
-const inputStyle = {
-  border: `1px solid ${COLORS.border}`,
-  borderRadius: 4,
-  padding: "5px 8px",
-  fontSize: 14,
-  fontFamily: "'Inter', sans-serif",
-  outline: "none",
-};
-
-const btnBase = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 6,
-  padding: "9px 14px",
-  borderRadius: 4,
-  border: "none",
-  fontSize: 13,
-  fontWeight: 600,
-  fontFamily: "'Inter', sans-serif",
-};
+import { ThemeToggle } from "./ThemeToggle";
 
 type Tab = "conversa" | "atencao" | "funil";
 
@@ -43,6 +23,7 @@ export default function CrmApp({
   initialNotes: Note[];
   initialReminders: Reminder[];
 }) {
+  const { colors: COLORS } = useTheme();
   const supabase = createClient();
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [notes, setNotes] = useState<Note[]>(initialNotes);
@@ -61,6 +42,30 @@ export default function CrmApp({
   const [processing, setProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const logEndRef = useRef<HTMLDivElement>(null);
+
+  const inputStyle = {
+    border: `1px solid ${COLORS.border}`,
+    borderRadius: 4,
+    padding: "5px 8px",
+    fontSize: 14,
+    fontFamily: "'Archivo', sans-serif",
+    outline: "none",
+    background: COLORS.panel,
+    color: COLORS.ink,
+  };
+
+  const btnBase = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    padding: "9px 14px",
+    borderRadius: 4,
+    border: "none",
+    fontSize: 13,
+    fontWeight: 600,
+    fontFamily: "'Archivo', sans-serif",
+  };
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -105,7 +110,7 @@ export default function CrmApp({
   const handleSend = async () => {
     if (!input.trim() || processing) return;
     const message = input.trim();
-    setChatLog((prev) => [...prev, { role: "user", text: message, id: uid("m") }]);
+    setChatLog((prev) => [...prev, { role: "user", text: message, id: uid("m"), time: fmtTime(Date.now()) }]);
     setInput("");
     setProcessing(true);
     setErrorMsg("");
@@ -113,7 +118,7 @@ export default function CrmApp({
       const result = await extractIntent(message, leads);
       if (result.mode === "query") {
         const answer = buildAnswer(result, leads, notes);
-        setChatLog((prev) => [...prev, { role: "system", id: uid("s"), text: answer }]);
+        setChatLog((prev) => [...prev, { role: "system", id: uid("s"), text: answer, time: fmtTime(Date.now()) }]);
       } else {
         setDraft(result);
       }
@@ -171,14 +176,17 @@ export default function CrmApp({
 
     const tagPart = tagsToAdd.length ? ` Etiquetas: ${tagsToAdd.join(", ")}.` : "";
     const visitPart = visit
-      ? ` Visita agendada para ${fmtDate(visit.dueAt)} às ${new Date(visit.dueAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} — já está no card e na agenda.`
+      ? ` Visita agendada para ${fmtDate(visit.dueAt)} às ${fmtTime(visit.dueAt)} — já está no card e na agenda.`
       : "";
     const followPart = cadence
       ? ` Cadência de follow-up ativada (${CADENCE_DAYS.join(", ")} dias).`
       : reminder
       ? ` Lembrete criado para ${fmtDate(daysFromNow(reminder.days))}.`
       : "";
-    setChatLog((prev) => [...prev, { role: "system", id: uid("s"), text: `✓ Registrado com ${lead?.name}.${tagPart}${visitPart}${followPart}` }]);
+    setChatLog((prev) => [
+      ...prev,
+      { role: "system", id: uid("s"), text: `✓ Registrado com ${lead?.name}.${tagPart}${visitPart}${followPart}`, time: fmtTime(Date.now()) },
+    ]);
     setDraft(null);
   };
 
@@ -191,7 +199,7 @@ export default function CrmApp({
   return (
     <div
       style={{
-        fontFamily: "'Inter', sans-serif",
+        fontFamily: "'Archivo', sans-serif",
         background: COLORS.bg,
         color: COLORS.ink,
         minHeight: "100vh",
@@ -202,14 +210,12 @@ export default function CrmApp({
         position: "relative",
       }}
     >
-      <header style={{ padding: "20px 20px 14px", borderBottom: `1px solid ${COLORS.border}` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-          <Building2 size={18} color={COLORS.emerald} />
-          <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: COLORS.brass, letterSpacing: 1.5, textTransform: "uppercase" }}>
-            MVP · etiquetas, notas e consultas
-          </span>
+      <header style={{ padding: "18px 20px 14px", borderBottom: `1px solid ${COLORS.border}` }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <span style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: 15, letterSpacing: 0.2 }}>CLOSER</span>
+          <ThemeToggle />
         </div>
-        <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: 24, margin: 0, letterSpacing: -0.3 }}>
+        <h1 style={{ fontFamily: "'Archivo Black', sans-serif", fontWeight: 400, fontSize: 22, margin: 0, letterSpacing: -0.2 }}>
           {tab === "funil" && "Funil de leads"}
           {tab === "atencao" && "Precisa de atenção"}
           {tab === "conversa" && "Conversa"}
@@ -220,13 +226,13 @@ export default function CrmApp({
         {tab === "funil" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {showNewLead ? (
-              <div style={{ background: COLORS.panel, border: `1px dashed ${COLORS.brass}`, borderRadius: 6, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ background: COLORS.panel, border: `1px dashed ${COLORS.accent}`, borderRadius: 6, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
                 <input placeholder="Nome" value={newLeadName} onChange={(e) => setNewLeadName(e.target.value)} style={inputStyle} />
                 <input placeholder="Telefone" value={newLeadPhone} onChange={(e) => setNewLeadPhone(e.target.value)} style={inputStyle} />
                 <input placeholder="Origem (Tráfego, Indicação…)" value={newLeadOrigin} onChange={(e) => setNewLeadOrigin(e.target.value)} style={inputStyle} />
                 <input placeholder="Imóvel de interesse" value={newLeadProperty} onChange={(e) => setNewLeadProperty(e.target.value)} style={inputStyle} />
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={createLead} style={{ ...btnBase, background: COLORS.emerald, color: "#fff", flex: 1 }}>
+                  <button onClick={createLead} style={{ ...btnBase, background: COLORS.accent, color: COLORS.onAccent, flex: 1 }}>
                     Adicionar
                   </button>
                   <button onClick={() => setShowNewLead(false)} style={{ ...btnBase, background: "transparent", color: COLORS.muted, border: `1px solid ${COLORS.border}` }}>
@@ -237,7 +243,7 @@ export default function CrmApp({
             ) : (
               <button
                 onClick={() => setShowNewLead(true)}
-                style={{ ...btnBase, background: COLORS.emeraldSoft, color: COLORS.emerald, alignSelf: "flex-start" }}
+                style={{ ...btnBase, background: COLORS.accentSoft, color: COLORS.accent, alignSelf: "flex-start" }}
               >
                 + Novo lead
               </button>
@@ -247,7 +253,7 @@ export default function CrmApp({
               if (!stageLeads.length) return null;
               return (
                 <div key={stage.id}>
-                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6, paddingLeft: 2 }}>
+                  <div style={{ fontFamily: "'Roboto Mono', monospace", fontSize: 11, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6, paddingLeft: 2 }}>
                     {stage.label} · {stageLeads.length}
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -264,7 +270,7 @@ export default function CrmApp({
                             {!!(lead.tags || []).length && (
                               <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 6 }}>
                                 {lead.tags.map((t) => (
-                                  <TagChip key={t} label={t} tone={t === "Aguardando retorno" ? "urgent" : "brass"} />
+                                  <TagChip key={t} label={t} tone={t === "Aguardando retorno" ? "urgent" : "accent"} />
                                 ))}
                               </div>
                             )}
@@ -289,7 +295,7 @@ export default function CrmApp({
                                 </option>
                               ))}
                             </select>
-                            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: COLORS.muted, textTransform: "uppercase", marginBottom: 6 }}>
+                            <div style={{ fontFamily: "'Roboto Mono', monospace", fontSize: 10.5, color: COLORS.muted, textTransform: "uppercase", marginBottom: 6 }}>
                               Histórico e notas
                             </div>
                             {notes.filter((n) => n.leadId === lead.id).length === 0 && (
@@ -301,7 +307,7 @@ export default function CrmApp({
                               .reverse()
                               .map((n) => (
                                 <div key={n.id} style={{ fontSize: 13, padding: "6px 0", borderBottom: `1px solid ${COLORS.border}` }}>
-                                  <span style={{ color: COLORS.muted, fontSize: 11.5, fontFamily: "'IBM Plex Mono', monospace" }}>{fmtDate(n.createdAt)} — </span>
+                                  <span style={{ color: COLORS.muted, fontSize: 11.5, fontFamily: "'Roboto Mono', monospace" }}>{fmtDate(n.createdAt)} — </span>
                                   {n.text}
                                 </div>
                               ))}
@@ -319,7 +325,7 @@ export default function CrmApp({
         {tab === "atencao" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             <div>
-              <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
+              <div style={{ fontFamily: "'Roboto Mono', monospace", fontSize: 11, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
                 Hoje e atrasados
               </div>
               {todayFollowups.length === 0 && (
@@ -334,18 +340,18 @@ export default function CrmApp({
                       key={r.id}
                       style={{ background: COLORS.panel, border: `1px solid ${overdue ? COLORS.urgent : COLORS.border}`, borderRadius: 6, padding: 12, display: "flex", gap: 10, alignItems: "flex-start" }}
                     >
-                      <Clock size={16} color={overdue ? COLORS.urgent : COLORS.brass} style={{ marginTop: 2, flexShrink: 0 }} />
+                      <Clock size={16} color={overdue ? COLORS.urgent : COLORS.accent} style={{ marginTop: 2, flexShrink: 0 }} />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: 14 }}>{lead?.name || "Lead"}</div>
                         <div style={{ fontSize: 13, color: COLORS.inkSoft, margin: "2px 0 4px" }}>{r.text}</div>
-                        <div style={{ fontSize: 11.5, fontFamily: "'IBM Plex Mono', monospace", color: overdue ? COLORS.urgent : COLORS.muted }}>
+                        <div style={{ fontSize: 11.5, fontFamily: "'Roboto Mono', monospace", color: overdue ? COLORS.urgent : COLORS.muted }}>
                           {overdue ? "Atrasado · " : ""}
                           {fmtDate(r.dueAt)}
                         </div>
                       </div>
                       <button
                         onClick={() => toggleReminderDone(r.id)}
-                        style={{ ...btnBase, background: COLORS.emeraldSoft, color: COLORS.emerald, padding: "6px 10px" }}
+                        style={{ ...btnBase, background: COLORS.accentSoft, color: COLORS.accent, padding: "6px 10px" }}
                       >
                         <Check size={14} />
                       </button>
@@ -356,7 +362,7 @@ export default function CrmApp({
             </div>
 
             <div>
-              <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
+              <div style={{ fontFamily: "'Roboto Mono', monospace", fontSize: 11, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
                 Próximos compromissos
               </div>
               {upcomingVisits.length === 0 && (
@@ -366,19 +372,18 @@ export default function CrmApp({
                 {upcomingVisits.map((r) => {
                   const lead = leads.find((l) => l.id === r.leadId);
                   return (
-                    <div key={r.id} style={{ background: COLORS.emeraldSoft, borderRadius: 6, padding: 12, display: "flex", gap: 10, alignItems: "flex-start" }}>
-                      <Clock size={16} color={COLORS.emerald} style={{ marginTop: 2, flexShrink: 0 }} />
+                    <div key={r.id} style={{ background: COLORS.accentSoft, borderRadius: 6, padding: 12, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                      <Clock size={16} color={COLORS.accent} style={{ marginTop: 2, flexShrink: 0 }} />
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 14, color: COLORS.emerald }}>{lead?.name || "Lead"}</div>
-                        <div style={{ fontSize: 13, color: COLORS.emerald, margin: "2px 0 4px" }}>{r.text}</div>
-                        <div style={{ fontSize: 11.5, fontFamily: "'IBM Plex Mono', monospace", color: COLORS.emerald }}>
-                          {new Date(r.dueAt).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" })} às{" "}
-                          {new Date(r.dueAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                        <div style={{ fontWeight: 600, fontSize: 14, color: COLORS.accent }}>{lead?.name || "Lead"}</div>
+                        <div style={{ fontSize: 13, color: COLORS.accent, margin: "2px 0 4px" }}>{r.text}</div>
+                        <div style={{ fontSize: 11.5, fontFamily: "'Roboto Mono', monospace", color: COLORS.accent }}>
+                          {new Date(r.dueAt).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" })} às {fmtTime(r.dueAt)}
                         </div>
                       </div>
                       <button
                         onClick={() => toggleReminderDone(r.id)}
-                        style={{ ...btnBase, background: COLORS.panel, color: COLORS.emerald, padding: "6px 10px" }}
+                        style={{ ...btnBase, background: COLORS.panel, color: COLORS.accent, padding: "6px 10px" }}
                       >
                         <Check size={14} />
                       </button>
@@ -391,7 +396,7 @@ export default function CrmApp({
         )}
 
         {tab === "conversa" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column" }}>
             {chatLog.length === 0 && !draft && (
               <div style={{ textAlign: "center", padding: "26px 12px", color: COLORS.muted, fontSize: 13.5, lineHeight: 1.6 }}>
                 Digite como se estivesse narrando pra alguém o que aconteceu — ou faça uma pergunta.
@@ -408,23 +413,31 @@ export default function CrmApp({
               <div
                 key={m.id}
                 style={{
-                  alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-                  maxWidth: "88%",
-                  background: m.role === "user" ? COLORS.emerald : COLORS.emeraldSoft,
-                  color: m.role === "user" ? "#fff" : COLORS.emerald,
-                  padding: "9px 13px",
-                  borderRadius: 12,
-                  fontSize: 14,
-                  lineHeight: 1.4,
-                  whiteSpace: "pre-line",
+                  display: "grid",
+                  gridTemplateColumns: "46px 1fr",
+                  gap: 10,
+                  padding: "9px 0",
+                  fontSize: 13.5,
+                  lineHeight: 1.5,
+                  borderLeft: m.role === "user" ? `2px solid ${COLORS.accent}` : "2px solid transparent",
+                  paddingLeft: m.role === "user" ? 10 : 0,
+                  marginLeft: m.role === "user" ? -2 : 0,
+                  color: m.role === "user" ? COLORS.ink : COLORS.inkSoft,
                 }}
               >
-                {m.text}
+                <span style={{ fontFamily: "'Roboto Mono', monospace", fontSize: 10.5, color: COLORS.muted, paddingTop: 2 }}>
+                  {m.role === "system" ? "→" : m.time}
+                </span>
+                <span style={{ whiteSpace: "pre-line" }}>{m.text}</span>
               </div>
             ))}
-            {processing && <div style={{ alignSelf: "flex-start", fontSize: 13, color: COLORS.muted, fontStyle: "italic" }}>interpretando…</div>}
-            {errorMsg && <div style={{ fontSize: 13, color: COLORS.urgent }}>{errorMsg}</div>}
-            {draft && <Receipt draft={draft} leads={leads} onConfirm={confirmDraft} onCancel={() => setDraft(null)} />}
+            {processing && <div style={{ fontSize: 13, color: COLORS.muted, fontStyle: "italic", padding: "9px 0" }}>interpretando…</div>}
+            {errorMsg && <div style={{ fontSize: 13, color: COLORS.urgent, padding: "9px 0" }}>{errorMsg}</div>}
+            {draft && (
+              <div style={{ paddingTop: 6 }}>
+                <Receipt draft={draft} leads={leads} onConfirm={confirmDraft} onCancel={() => setDraft(null)} />
+              </div>
+            )}
             <div ref={logEndRef} />
           </div>
         )}
@@ -433,7 +446,7 @@ export default function CrmApp({
       {tab === "conversa" && (
         <div style={{ position: "sticky", bottom: 58, padding: "10px 16px", background: `linear-gradient(${COLORS.bg}00, ${COLORS.bg} 30%)` }}>
           <div style={{ display: "flex", gap: 8, background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 24, padding: "6px 6px 6px 16px", alignItems: "center" }}>
-            <button style={{ background: "none", border: "none", color: COLORS.brass, display: "flex", cursor: "pointer" }} title="Entrada por voz (ainda não implementada)">
+            <button style={{ background: "none", border: "none", color: COLORS.accent, display: "flex", cursor: "pointer" }} title="Entrada por voz (ainda não implementada)">
               <Mic size={18} />
             </button>
             <input
@@ -441,12 +454,12 @@ export default function CrmApp({
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="Digite o que aconteceu ou pergunte algo…"
-              style={{ flex: 1, border: "none", outline: "none", fontSize: 14, fontFamily: "'Inter', sans-serif", background: "transparent" }}
+              style={{ flex: 1, border: "none", outline: "none", fontSize: 14, fontFamily: "'Archivo', sans-serif", background: "transparent", color: COLORS.ink }}
             />
             <button
               onClick={handleSend}
               disabled={processing || !input.trim()}
-              style={{ ...btnBase, borderRadius: "50%", width: 34, height: 34, padding: 0, background: COLORS.emerald, color: "#fff", opacity: processing || !input.trim() ? 0.5 : 1 }}
+              style={{ ...btnBase, borderRadius: "50%", width: 34, height: 34, padding: 0, background: COLORS.accent, color: COLORS.onAccent, opacity: processing || !input.trim() ? 0.5 : 1 }}
             >
               <Send size={14} />
             </button>
@@ -465,7 +478,7 @@ export default function CrmApp({
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "10px 0 12px", background: "none", border: "none", color: tab === t.id ? COLORS.emerald : COLORS.muted, cursor: "pointer", position: "relative" }}
+            style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "10px 0 12px", background: "none", border: "none", color: tab === t.id ? COLORS.accent : COLORS.muted, cursor: "pointer", position: "relative" }}
           >
             <t.icon size={19} />
             <span style={{ fontSize: 10.5, fontWeight: tab === t.id ? 600 : 500 }}>{t.label}</span>

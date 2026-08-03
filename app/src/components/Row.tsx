@@ -1,14 +1,15 @@
-import { COLORS } from "@/lib/colors";
+import { useTheme } from "@/lib/theme";
 import type { ReactNode } from "react";
 
 export function Row({ label, children }: { label: string; children: ReactNode }) {
+  const { colors: COLORS } = useTheme();
   return (
     <div style={{ display: "flex", gap: 12, fontSize: 14 }}>
       <span
         style={{
           width: 68,
           flexShrink: 0,
-          fontFamily: "'IBM Plex Mono', monospace",
+          fontFamily: "'Roboto Mono', monospace",
           fontSize: 11,
           color: COLORS.muted,
           textTransform: "uppercase",
