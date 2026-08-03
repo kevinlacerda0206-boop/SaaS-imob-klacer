@@ -13,11 +13,17 @@ import { TagChip } from "./TagChip";
 import { Receipt } from "./Receipt";
 import { ThemeToggle } from "./ThemeToggle";
 import { NavDrawer, type ViewId } from "./NavDrawer";
+import { ProfileView } from "./ProfileView";
+import { TeamView } from "./TeamView";
+import { SupportView } from "./SupportView";
 
 const TITLES: Record<ViewId, string> = {
   conversa: "Conversa",
   atencao: "Precisa de atenção",
   funil: "Funil de leads",
+  perfil: "Perfil",
+  equipe: "Equipe",
+  suporte: "Suporte",
 };
 
 export default function CrmApp({
@@ -481,6 +487,10 @@ export default function CrmApp({
             })}
           </div>
         )}
+
+        {view === "perfil" && <ProfileView />}
+        {view === "equipe" && <TeamView />}
+        {view === "suporte" && <SupportView />}
       </main>
 
       {view === "conversa" && (

@@ -1,14 +1,20 @@
 "use client";
 
-import { MessageCircle, Clock, LayoutGrid, LogOut, X } from "lucide-react";
+import { MessageCircle, Clock, LayoutGrid, User, Users, LifeBuoy, LogOut, X } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 
-export type ViewId = "conversa" | "atencao" | "funil";
+export type ViewId = "conversa" | "atencao" | "funil" | "perfil" | "equipe" | "suporte";
 
-const ITEMS: { id: ViewId; label: string; icon: typeof MessageCircle }[] = [
+const MAIN_ITEMS: { id: ViewId; label: string; icon: typeof MessageCircle }[] = [
   { id: "conversa", label: "Conversa", icon: MessageCircle },
   { id: "atencao", label: "Precisa de atenção", icon: Clock },
   { id: "funil", label: "Funil de leads", icon: LayoutGrid },
+];
+
+const ACCOUNT_ITEMS: { id: ViewId; label: string; icon: typeof MessageCircle }[] = [
+  { id: "perfil", label: "Perfil", icon: User },
+  { id: "equipe", label: "Equipe", icon: Users },
+  { id: "suporte", label: "Suporte", icon: LifeBuoy },
 ];
 
 export function NavDrawer({
@@ -27,6 +33,23 @@ export function NavDrawer({
   onLogout: () => void;
 }) {
   const { colors } = useTheme();
+
+  const itemStyle = (active: boolean) => ({
+    display: "flex" as const,
+    alignItems: "center" as const,
+    gap: 12,
+    padding: "10px 10px",
+    borderRadius: 8,
+    border: "none",
+    background: active ? colors.accentSoft : "transparent",
+    color: active ? colors.accent : colors.ink,
+    fontSize: 14,
+    fontWeight: active ? 600 : 500,
+    fontFamily: "'Archivo', sans-serif",
+    cursor: "pointer" as const,
+    textAlign: "left" as const,
+    position: "relative" as const,
+  });
 
   return (
     <>
@@ -57,6 +80,7 @@ export function NavDrawer({
           display: "flex",
           flexDirection: "column",
           padding: "18px 14px",
+          overflowY: "auto",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22, paddingLeft: 6 }}>
@@ -67,49 +91,38 @@ export function NavDrawer({
         </div>
 
         <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {ITEMS.map((item) => {
-            const active = view === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onNavigate(item.id)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "10px 10px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: active ? colors.accentSoft : "transparent",
-                  color: active ? colors.accent : colors.ink,
-                  fontSize: 14,
-                  fontWeight: active ? 600 : 500,
-                  fontFamily: "'Archivo', sans-serif",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  position: "relative",
-                }}
-              >
-                <item.icon size={17} />
-                {item.label}
-                {item.id === "atencao" && attentionBadge > 0 && (
-                  <span
-                    style={{
-                      marginLeft: "auto",
-                      background: colors.urgent,
-                      color: "#fff",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      borderRadius: 10,
-                      padding: "1px 7px",
-                    }}
-                  >
-                    {attentionBadge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+          {MAIN_ITEMS.map((item) => (
+            <button key={item.id} onClick={() => onNavigate(item.id)} style={itemStyle(view === item.id)}>
+              <item.icon size={17} />
+              {item.label}
+              {item.id === "atencao" && attentionBadge > 0 && (
+                <span
+                  style={{
+                    marginLeft: "auto",
+                    background: colors.urgent,
+                    color: "#fff",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    borderRadius: 10,
+                    padding: "1px 7px",
+                  }}
+                >
+                  {attentionBadge}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+
+        <div style={{ height: 1, background: colors.border, margin: "14px 6px" }} />
+
+        <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {ACCOUNT_ITEMS.map((item) => (
+            <button key={item.id} onClick={() => onNavigate(item.id)} style={itemStyle(view === item.id)}>
+              <item.icon size={17} />
+              {item.label}
+            </button>
+          ))}
         </nav>
 
         <div style={{ flex: 1 }} />
