@@ -1,4 +1,11 @@
-import type { Lead, Note, Draft, WriteDraft, QueryDraft } from "./types";
+import type { Lead, Note, Draft, WriteDraft, ChatMessage } from "./types";
+
+interface LocalQueryIntent {
+  queryKind: "notes" | "tag" | "unknown";
+  leadId?: string;
+  leadName?: string;
+  tag?: string;
+}
 
 // ————————————————————————————————————————————————————————————————
 // SIMULADOR LOCAL — reproduz por regras de texto o comportamento que, no
@@ -116,20 +123,20 @@ function detectTagFromQuery(lower: string): string | null {
   return null;
 }
 
-function buildQueryDraft(message: string, leads: Lead[]): QueryDraft {
+function buildQueryDraft(message: string, leads: Lead[]): LocalQueryIntent {
   const lower = message.toLowerCase();
   const matched = findLead(message, leads);
 
   if (matched && /(nota|prefere|procura|busca|o que.*quer)/i.test(message)) {
-    return { mode: "query", queryKind: "notes", leadId: matched.id, leadName: matched.name };
+    return { queryKind: "notes", leadId: matched.id, leadName: matched.name };
   }
 
   const tag = detectTagFromQuery(lower);
   if (tag) {
-    return { mode: "query", queryKind: "tag", tag };
+    return { queryKind: "tag", tag };
   }
 
-  return { mode: "query", queryKind: "unknown", raw: message };
+  return { queryKind: "unknown" };
 }
 
 function buildWriteDraft(message: string, leads: Lead[]): WriteDraft {
@@ -199,50 +206,57 @@ function buildWriteDraft(message: string, leads: Lead[]): WriteDraft {
   };
 }
 
-function classifyMessage(message: string, leads: Lead[]): Draft {
+function buildLocalAnswer(intent: LocalQueryIntent, leads: Lead[], notes: Note[]): string {
+  if (intent.queryKind === "notes") {
+    const leadNotes = notes.filter((n) => n.leadId === intent.leadId);
+    if (!leadNotes.length) return `Ainda não tenho nada registrado sobre ${intent.leadName}.`;
+    return (
+      `O que já sei sobre ${intent.leadName}:\n` +
+      leadNotes.slice().reverse().map((n) => `• ${n.text}`).join("\n")
+    );
+  }
+  if (intent.queryKind === "tag") {
+    const matches = leads.filter((l) => (l.tags || []).includes(intent.tag as string));
+    if (!matches.length) return `Nenhum lead com a etiqueta "${intent.tag}" no momento.`;
+    return `Com a etiqueta "${intent.tag}":\n` + matches.map((l) => `• ${l.name} · ${l.property}`).join("\n");
+  }
+  return `Não consegui entender agora (a extração real via Claude não está disponível neste momento). Tenta algo como "quais as notas da Fernanda" ou "quem eu preciso enviar opções".`;
+}
+
+function classifyMessage(message: string, leads: Lead[], notes: Note[]): Draft {
   const trimmed = message.trim();
   const isQuestion = /\?\s*$/.test(trimmed) || /^(quem|quais|me (d[êe]|fala|mostra)|liste|mostra)/i.test(trimmed);
-  return isQuestion ? buildQueryDraft(trimmed, leads) : buildWriteDraft(trimmed, leads);
+  if (isQuestion) {
+    const intent = buildQueryDraft(trimmed, leads);
+    return { mode: "answer", text: buildLocalAnswer(intent, leads, notes) };
+  }
+  return buildWriteDraft(trimmed, leads);
 }
 
-async function extractIntentLocal(message: string, leads: Lead[]): Promise<Draft> {
+async function extractIntentLocal(message: string, leads: Lead[], notes: Note[]): Promise<Draft> {
   await new Promise((r) => setTimeout(r, 450)); // simula tempo de processamento
-  return classifyMessage(message, leads);
+  return classifyMessage(message, leads, notes);
 }
 
-// Chama a extração real via Claude no servidor (/api/intent). Se a rota não
-// estiver disponível ainda (ex: ANTHROPIC_API_KEY não configurada), cai de
-// volta pro simulador local por regras, sem quebrar a experiência.
-export async function extractIntent(message: string, leads: Lead[]): Promise<Draft> {
+// Chama a extração real via Claude no servidor (/api/intent), com memória da
+// conversa e acesso às notas/etiquetas dos leads. Se a rota não estiver
+// disponível ainda (ex: ANTHROPIC_API_KEY não configurada), cai de volta pro
+// simulador local por regras, sem quebrar a experiência.
+export async function extractIntent(message: string, leads: Lead[], notes: Note[], history: ChatMessage[]): Promise<Draft> {
   try {
     const res = await fetch("/api/intent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message,
-        leads: leads.map((l) => ({ id: l.id, name: l.name, property: l.property })),
+        leads: leads.map((l) => ({ id: l.id, name: l.name, property: l.property, tags: l.tags })),
+        notes: notes.slice(-40).map((n) => ({ leadId: n.leadId, text: n.text, createdAt: n.createdAt })),
+        history: history.slice(-12).map((m) => ({ role: m.role, text: m.text })),
       }),
     });
     if (!res.ok) throw new Error(`API respondeu ${res.status}`);
     return (await res.json()) as Draft;
   } catch {
-    return extractIntentLocal(message, leads);
+    return extractIntentLocal(message, leads, notes);
   }
-}
-
-export function buildAnswer(draft: QueryDraft, leads: Lead[], notes: Note[]): string {
-  if (draft.queryKind === "notes") {
-    const leadNotes = notes.filter((n) => n.leadId === draft.leadId);
-    if (!leadNotes.length) return `Ainda não tenho nada registrado sobre ${draft.leadName}.`;
-    return (
-      `O que já sei sobre ${draft.leadName}:\n` +
-      leadNotes.slice().reverse().map((n) => `• ${n.text}`).join("\n")
-    );
-  }
-  if (draft.queryKind === "tag") {
-    const matches = leads.filter((l) => (l.tags || []).includes(draft.tag as string));
-    if (!matches.length) return `Nenhum lead com a etiqueta "${draft.tag}" no momento.`;
-    return `Com a etiqueta "${draft.tag}":\n` + matches.map((l) => `• ${l.name} · ${l.property}`).join("\n");
-  }
-  return `Não entendi bem a pergunta. Tenta algo como "quais as notas da Fernanda" ou "quem eu preciso enviar opções".`;
 }

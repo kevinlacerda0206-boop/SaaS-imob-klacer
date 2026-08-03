@@ -47,16 +47,12 @@ export interface WriteDraft {
   reminder: { create: boolean; due_in_days: number | null; text: string | null };
 }
 
-export interface QueryDraft {
-  mode: "query";
-  queryKind: "notes" | "tag" | "unknown";
-  leadId?: string;
-  leadName?: string;
-  tag?: string;
-  raw?: string;
+export interface AnswerDraft {
+  mode: "answer";
+  text: string;
 }
 
-export type Draft = WriteDraft | QueryDraft;
+export type Draft = WriteDraft | AnswerDraft;
 
 export interface ConfirmPayload {
   leadId: string | undefined;

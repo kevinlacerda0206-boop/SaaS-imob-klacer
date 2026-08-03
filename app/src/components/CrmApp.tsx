@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Mic, Send, Check, Clock, ChevronRight, Menu } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { STAGES, CADENCE_DAYS } from "@/lib/colors";
-import { uid, fmtDate, fmtTime, daysFromNow, extractIntent, buildAnswer } from "@/lib/intent";
+import { uid, fmtDate, fmtTime, daysFromNow, extractIntent } from "@/lib/intent";
 import type { Lead, Note, Reminder, ChatMessage, WriteDraft, ConfirmPayload } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { leadFromRow, noteFromRow, reminderFromRow } from "@/lib/supabase/mappers";
@@ -134,10 +134,9 @@ export default function CrmApp({
     setProcessing(true);
     setErrorMsg("");
     try {
-      const result = await extractIntent(message, leads);
-      if (result.mode === "query") {
-        const answer = buildAnswer(result, leads, notes);
-        setChatLog((prev) => [...prev, { role: "system", id: uid("s"), text: answer, time: fmtTime(Date.now()) }]);
+      const result = await extractIntent(message, leads, notes, chatLog);
+      if (result.mode === "answer") {
+        setChatLog((prev) => [...prev, { role: "system", id: uid("s"), text: result.text, time: fmtTime(Date.now()) }]);
       } else {
         setDraft(result);
       }
