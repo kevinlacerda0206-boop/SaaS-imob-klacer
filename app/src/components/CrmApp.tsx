@@ -1,15 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Mic, Send, Check, Clock, LayoutGrid, MessageCircle, ChevronRight, Building2 } from "lucide-react";
 import { COLORS, STAGES, CADENCE_DAYS } from "@/lib/colors";
-import { SEED_LEADS } from "@/lib/seed";
 import { uid, fmtDate, daysFromNow, extractIntent, buildAnswer } from "@/lib/intent";
 import type { Lead, Note, Reminder, ChatMessage, WriteDraft, ConfirmPayload } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import { leadFromRow, noteFromRow, reminderFromRow } from "@/lib/supabase/mappers";
 import { TagChip } from "./TagChip";
 import { Receipt } from "./Receipt";
-
-const STORAGE_KEY = "crm-data-v2";
 
 const inputStyle = {
   border: `1px solid ${COLORS.border}`,
@@ -35,13 +34,26 @@ const btnBase = {
 
 type Tab = "conversa" | "atencao" | "funil";
 
-export default function CrmApp() {
-  const [leads, setLeads] = useState<Lead[]>(SEED_LEADS);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [reminders, setReminders] = useState<Reminder[]>([]);
+export default function CrmApp({
+  initialLeads,
+  initialNotes,
+  initialReminders,
+}: {
+  initialLeads: Lead[];
+  initialNotes: Note[];
+  initialReminders: Reminder[];
+}) {
+  const supabase = createClient();
+  const [leads, setLeads] = useState<Lead[]>(initialLeads);
+  const [notes, setNotes] = useState<Note[]>(initialNotes);
+  const [reminders, setReminders] = useState<Reminder[]>(initialReminders);
   const [tab, setTab] = useState<Tab>("conversa");
-  const [loaded, setLoaded] = useState(false);
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
+  const [showNewLead, setShowNewLead] = useState(false);
+  const [newLeadName, setNewLeadName] = useState("");
+  const [newLeadPhone, setNewLeadPhone] = useState("");
+  const [newLeadOrigin, setNewLeadOrigin] = useState("");
+  const [newLeadProperty, setNewLeadProperty] = useState("");
 
   const [chatLog, setChatLog] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -51,38 +63,44 @@ export default function CrmApp() {
   const logEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        setLeads(parsed.leads?.length ? parsed.leads : SEED_LEADS);
-        setNotes(parsed.notes || []);
-        setReminders(parsed.reminders || []);
-      }
-    } catch {
-      // sem dado salvo ainda — segue com o seed
-    }
-    setLoaded(true);
-  }, []);
-
-  const persist = useCallback((nextLeads: Lead[], nextNotes: Note[], nextReminders: Reminder[]) => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ leads: nextLeads, notes: nextNotes, reminders: nextReminders }));
-    } catch (e) {
-      console.error("Falha ao salvar", e);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (loaded) persist(leads, notes, reminders);
-  }, [leads, notes, reminders, loaded, persist]);
-
-  useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatLog, draft]);
 
-  const changeStage = (leadId: string, stage: Lead["stage"]) =>
+  const changeStage = async (leadId: string, stage: Lead["stage"]) => {
     setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, stage } : l)));
+    const { error } = await supabase.from("leads").update({ stage }).eq("id", leadId);
+    if (error) setErrorMsg(`Falha ao atualizar estágio: ${error.message}`);
+  };
+
+  const toggleReminderDone = async (id: string) => {
+    setReminders((prev) => prev.map((x) => (x.id === id ? { ...x, done: true } : x)));
+    const { error } = await supabase.from("reminders").update({ done: true }).eq("id", id);
+    if (error) setErrorMsg(`Falha ao concluir lembrete: ${error.message}`);
+  };
+
+  const createLead = async () => {
+    if (!newLeadName.trim()) return;
+    const { data, error } = await supabase
+      .from("leads")
+      .insert({
+        name: newLeadName.trim(),
+        phone: newLeadPhone.trim() || null,
+        origin: newLeadOrigin.trim() || null,
+        property_interest: newLeadProperty.trim() || null,
+      })
+      .select()
+      .single();
+    if (error || !data) {
+      setErrorMsg(`Falha ao criar lead: ${error?.message}`);
+      return;
+    }
+    setLeads((prev) => [leadFromRow(data), ...prev]);
+    setNewLeadName("");
+    setNewLeadPhone("");
+    setNewLeadOrigin("");
+    setNewLeadProperty("");
+    setShowNewLead(false);
+  };
 
   const handleSend = async () => {
     if (!input.trim() || processing) return;
@@ -106,42 +124,51 @@ export default function CrmApp() {
     }
   };
 
-  const confirmDraft = ({ leadId, noteText, tagsToAdd, tagsToRemove, reminder, cadence, visit }: ConfirmPayload) => {
+  const confirmDraft = async ({ leadId, noteText, tagsToAdd, tagsToRemove, reminder, cadence, visit }: ConfirmPayload) => {
     if (!leadId) return;
-    const note: Note = { id: uid("n"), leadId, text: noteText, createdAt: Date.now() };
-    setNotes((prev) => [...prev, note]);
 
-    setLeads((prev) =>
-      prev.map((l) => {
-        if (l.id !== leadId) return l;
-        const current = new Set(l.tags || []);
-        tagsToRemove.forEach((t) => current.delete(t));
-        tagsToAdd.forEach((t) => current.add(t));
-        return { ...l, tags: [...current] };
-      })
-    );
+    const lead = leads.find((l) => l.id === leadId);
+    const nextTags = (() => {
+      const current = new Set(lead?.tags || []);
+      tagsToRemove.forEach((t) => current.delete(t));
+      tagsToAdd.forEach((t) => current.add(t));
+      return [...current];
+    })();
 
-    const createdReminders: Reminder[] = [];
+    const remindersToInsert: { lead_id: string; kind: Reminder["kind"]; text: string; due_at: string }[] = [];
     if (visit) {
-      createdReminders.push({ id: uid("r"), leadId, dueAt: visit.dueAt, text: "Visita agendada", done: false, kind: "visita" });
+      remindersToInsert.push({ lead_id: leadId, kind: "visita", text: "Visita agendada", due_at: new Date(visit.dueAt).toISOString() });
     }
     if (cadence) {
-      createdReminders.push(
+      remindersToInsert.push(
         ...CADENCE_DAYS.map((d) => ({
-          id: uid("r"),
-          leadId,
-          dueAt: daysFromNow(d),
-          text: `Follow-up automático — sem retorno há ${d} dias`,
-          done: false,
+          lead_id: leadId,
           kind: "followup" as const,
+          text: `Follow-up automático — sem retorno há ${d} dias`,
+          due_at: new Date(daysFromNow(d)).toISOString(),
         }))
       );
     } else if (reminder) {
-      createdReminders.push({ id: uid("r"), leadId, dueAt: daysFromNow(reminder.days), text: "Cobrar retorno", done: false, kind: "followup" });
+      remindersToInsert.push({ lead_id: leadId, kind: "followup", text: "Cobrar retorno", due_at: new Date(daysFromNow(reminder.days)).toISOString() });
     }
-    if (createdReminders.length) setReminders((prev) => [...prev, ...createdReminders]);
 
-    const lead = leads.find((l) => l.id === leadId);
+    const [{ data: noteRow, error: noteError }, { error: leadError }, { data: reminderRows, error: reminderError }] = await Promise.all([
+      supabase.from("notes").insert({ lead_id: leadId, text: noteText }).select().single(),
+      supabase.from("leads").update({ tags: nextTags }).eq("id", leadId),
+      remindersToInsert.length
+        ? supabase.from("reminders").insert(remindersToInsert).select()
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (noteError || leadError || reminderError) {
+      setErrorMsg(`Falha ao gravar: ${noteError?.message || leadError?.message || reminderError?.message}`);
+      return;
+    }
+
+    if (noteRow) setNotes((prev) => [...prev, noteFromRow(noteRow)]);
+    setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, tags: nextTags } : l)));
+    if (reminderRows?.length) setReminders((prev) => [...prev, ...reminderRows.map(reminderFromRow)]);
+
     const tagPart = tagsToAdd.length ? ` Etiquetas: ${tagsToAdd.join(", ")}.` : "";
     const visitPart = visit
       ? ` Visita agendada para ${fmtDate(visit.dueAt)} às ${new Date(visit.dueAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} — já está no card e na agenda.`
@@ -192,6 +219,29 @@ export default function CrmApp() {
       <main style={{ flex: 1, overflowY: "auto", padding: 16, paddingBottom: 90 }}>
         {tab === "funil" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {showNewLead ? (
+              <div style={{ background: COLORS.panel, border: `1px dashed ${COLORS.brass}`, borderRadius: 6, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                <input placeholder="Nome" value={newLeadName} onChange={(e) => setNewLeadName(e.target.value)} style={inputStyle} />
+                <input placeholder="Telefone" value={newLeadPhone} onChange={(e) => setNewLeadPhone(e.target.value)} style={inputStyle} />
+                <input placeholder="Origem (Tráfego, Indicação…)" value={newLeadOrigin} onChange={(e) => setNewLeadOrigin(e.target.value)} style={inputStyle} />
+                <input placeholder="Imóvel de interesse" value={newLeadProperty} onChange={(e) => setNewLeadProperty(e.target.value)} style={inputStyle} />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={createLead} style={{ ...btnBase, background: COLORS.emerald, color: "#fff", flex: 1 }}>
+                    Adicionar
+                  </button>
+                  <button onClick={() => setShowNewLead(false)} style={{ ...btnBase, background: "transparent", color: COLORS.muted, border: `1px solid ${COLORS.border}` }}>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowNewLead(true)}
+                style={{ ...btnBase, background: COLORS.emeraldSoft, color: COLORS.emerald, alignSelf: "flex-start" }}
+              >
+                + Novo lead
+              </button>
+            )}
             {STAGES.map((stage) => {
               const stageLeads = leads.filter((l) => l.stage === stage.id);
               if (!stageLeads.length) return null;
@@ -294,7 +344,7 @@ export default function CrmApp() {
                         </div>
                       </div>
                       <button
-                        onClick={() => setReminders((prev) => prev.map((x) => (x.id === r.id ? { ...x, done: true } : x)))}
+                        onClick={() => toggleReminderDone(r.id)}
                         style={{ ...btnBase, background: COLORS.emeraldSoft, color: COLORS.emerald, padding: "6px 10px" }}
                       >
                         <Check size={14} />
@@ -327,7 +377,7 @@ export default function CrmApp() {
                         </div>
                       </div>
                       <button
-                        onClick={() => setReminders((prev) => prev.map((x) => (x.id === r.id ? { ...x, done: true } : x)))}
+                        onClick={() => toggleReminderDone(r.id)}
                         style={{ ...btnBase, background: COLORS.panel, color: COLORS.emerald, padding: "6px 10px" }}
                       >
                         <Check size={14} />
