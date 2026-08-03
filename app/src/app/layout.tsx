@@ -3,8 +3,8 @@ import "./globals.css";
 import { ThemeProvider } from "@/lib/theme";
 
 export const metadata: Metadata = {
-  title: "Closer",
-  description: "Closer — CRM por conversa pro corretor de imóveis",
+  title: "Klacer.ia",
+  description: "Klacer.ia — a IA do corretor de imóveis",
 };
 
 export default function RootLayout({

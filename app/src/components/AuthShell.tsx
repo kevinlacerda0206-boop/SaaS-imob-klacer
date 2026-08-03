@@ -54,7 +54,7 @@ export function AuthShell({ title, children }: { title: string; children: ReactN
         <ThemeToggle />
       </div>
       <div style={{ width: "100%", maxWidth: 380, background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 24 }}>
-        <span style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: 13, letterSpacing: 0.5, color: colors.accent }}>CLOSER</span>
+        <span style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: 13, letterSpacing: 0.5, color: colors.accent }}>KLACER.IA</span>
         <h1 style={{ fontFamily: "'Archivo Black', sans-serif", fontWeight: 400, fontSize: 22, margin: "6px 0 18px" }}>{title}</h1>
         {children}
       </div>

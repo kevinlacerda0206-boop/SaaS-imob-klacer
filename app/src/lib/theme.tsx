@@ -16,7 +16,7 @@ export interface ColorTokens {
   urgentSoft: string;
 }
 
-// Closer — tinta-azul-noite + latão. As duas variantes assumem a mesma
+// Klacer.ia — tinta-azul-noite + latão. As duas variantes assumem a mesma
 // identidade (mesmo hue de acento), só invertendo qual extremo é fundo.
 const DARK: ColorTokens = {
   bg: "#0E1420",
