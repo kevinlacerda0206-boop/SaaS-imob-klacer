@@ -1,14 +1,15 @@
 "use client";
 
-import { MessageCircle, Clock, LayoutGrid, User, Users, LifeBuoy, LogOut, X } from "lucide-react";
+import { MessageCircle, Clock, LayoutGrid, Upload, User, Users, LifeBuoy, LogOut, X } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 
-export type ViewId = "conversa" | "atencao" | "funil" | "perfil" | "equipe" | "suporte";
+export type ViewId = "conversa" | "atencao" | "funil" | "importar" | "perfil" | "equipe" | "suporte";
 
 const MAIN_ITEMS: { id: ViewId; label: string; icon: typeof MessageCircle }[] = [
   { id: "conversa", label: "Conversa", icon: MessageCircle },
   { id: "atencao", label: "Precisa de atenção", icon: Clock },
   { id: "funil", label: "Funil de leads", icon: LayoutGrid },
+  { id: "importar", label: "Importar leads", icon: Upload },
 ];
 
 const ACCOUNT_ITEMS: { id: ViewId; label: string; icon: typeof MessageCircle }[] = [

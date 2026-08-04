@@ -16,11 +16,13 @@ import { NavDrawer, type ViewId } from "./NavDrawer";
 import { ProfileView } from "./ProfileView";
 import { TeamView } from "./TeamView";
 import { SupportView } from "./SupportView";
+import { ImportView } from "./ImportView";
 
 const TITLES: Record<ViewId, string> = {
   conversa: "Conversa",
   atencao: "Precisa de atenção",
   funil: "Funil de leads",
+  importar: "Importar leads",
   perfil: "Perfil",
   equipe: "Equipe",
   suporte: "Suporte",
@@ -94,6 +96,17 @@ export default function CrmApp({
   const navigate = (v: ViewId) => {
     setView(v);
     setMenuOpen(false);
+  };
+
+  const refreshData = async () => {
+    const [{ data: leadRows }, { data: noteRows }, { data: reminderRows }] = await Promise.all([
+      supabase.from("leads").select("*").order("created_at", { ascending: false }),
+      supabase.from("notes").select("*").order("created_at", { ascending: true }),
+      supabase.from("reminders").select("*"),
+    ]);
+    setLeads((leadRows || []).map(leadFromRow));
+    setNotes((noteRows || []).map(noteFromRow));
+    setReminders((reminderRows || []).map(reminderFromRow));
   };
 
   const handleLogout = async () => {
@@ -495,6 +508,7 @@ export default function CrmApp({
           </div>
         )}
 
+        {view === "importar" && <ImportView onImported={refreshData} />}
         {view === "perfil" && <ProfileView />}
         {view === "equipe" && <TeamView />}
         {view === "suporte" && <SupportView />}
