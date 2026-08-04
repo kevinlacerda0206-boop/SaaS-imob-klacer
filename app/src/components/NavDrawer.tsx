@@ -24,6 +24,7 @@ export function NavDrawer({
   onNavigate,
   attentionBadge,
   onLogout,
+  isGuest,
 }: {
   open: boolean;
   onClose: () => void;
@@ -31,6 +32,7 @@ export function NavDrawer({
   onNavigate: (v: ViewId) => void;
   attentionBadge: number;
   onLogout: () => void;
+  isGuest: boolean;
 }) {
   const { colors } = useTheme();
 
@@ -145,7 +147,7 @@ export function NavDrawer({
           }}
         >
           <LogOut size={17} />
-          Sair
+          {isGuest ? "Sair (perde dados de convidado)" : "Sair"}
         </button>
       </aside>
     </>

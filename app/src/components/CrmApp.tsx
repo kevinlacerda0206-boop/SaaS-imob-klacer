@@ -81,9 +81,15 @@ export default function CrmApp({
     fontFamily: "'Archivo', sans-serif",
   };
 
+  const [isGuest, setIsGuest] = useState(false);
+
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatLog, draft]);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setIsGuest(!!data.user?.is_anonymous));
+  }, [supabase]);
 
   const navigate = (v: ViewId) => {
     setView(v);
@@ -241,6 +247,7 @@ export default function CrmApp({
         onNavigate={navigate}
         attentionBadge={todayList.length}
         onLogout={handleLogout}
+        isGuest={isGuest}
       />
 
       <header style={{ padding: "16px 16px 14px", borderBottom: `1px solid ${COLORS.border}` }}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -14,6 +14,16 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Sessão de convidado (anônima) não deve interferir na criação de uma
+    // conta de verdade — se existir uma, descarta antes de seguir.
+    (async () => {
+      const supabase = createClient();
+      const { data } = await supabase.auth.getUser();
+      if (data.user?.is_anonymous) await supabase.auth.signOut();
+    })();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

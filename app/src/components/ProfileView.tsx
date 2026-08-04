@@ -76,7 +76,7 @@ export function ProfileView() {
       </div>
       <div>
         <label style={labelStyle}>Email</label>
-        <div style={{ fontSize: 14, color: COLORS.inkSoft }}>{email}</div>
+        <div style={{ fontSize: 14, color: COLORS.inkSoft }}>{email || "convidado — sem conta permanente"}</div>
       </div>
       <div>
         <label style={labelStyle}>Função</label>
