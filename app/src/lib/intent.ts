@@ -250,8 +250,8 @@ export async function extractIntent(message: string, leads: Lead[], notes: Note[
       body: JSON.stringify({
         message,
         leads: leads.map((l) => ({ id: l.id, name: l.name, property: l.property, tags: l.tags })),
-        notes: notes.slice(-40).map((n) => ({ leadId: n.leadId, text: n.text, createdAt: n.createdAt })),
-        history: history.slice(-12).map((m) => ({ role: m.role, text: m.text })),
+        notes: notes.slice(-80).map((n) => ({ leadId: n.leadId, text: n.text, createdAt: n.createdAt })),
+        history: history.slice(-24).map((m) => ({ role: m.role, text: m.text })),
       }),
     });
     if (!res.ok) throw new Error(`API respondeu ${res.status}`);

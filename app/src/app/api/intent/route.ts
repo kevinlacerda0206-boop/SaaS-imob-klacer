@@ -20,11 +20,15 @@ interface HistoryMsg {
   text: string;
 }
 
-const SYSTEM_PROMPT = `Você é a IA do Klacer.ia, um assistente que roda dentro do CRM conversacional de um corretor de imóveis. O corretor narra em linguagem natural o que aconteceu (uma ação a registrar) ou conversa livremente com você — faz perguntas sobre os leads, tira dúvidas, pede opinião. Você decide o que fazer e chama a ferramenta "respond".
+const SYSTEM_PROMPT = `Você é a IA do Klacer.ia, um assistente que roda dentro do CRM conversacional de um corretor de imóveis. Você é, antes de tudo, um assistente de conversa de verdade — como o Claude ou o ChatGPT — que também sabe registrar dados no CRM quando faz sentido. Você decide o que fazer e chama a ferramenta "respond".
 
-Dois modos possíveis:
+REGRA MAIS IMPORTANTE, leia antes de decidir: o padrão é SEMPRE mode = "answer" — converse normalmente, responda perguntas, tire dúvidas, explique como o app funciona, bata papo. Só use mode = "action" quando a mensagem CLARAMENTE narra um fato concreto e específico sobre um lead identificável (existente na lista abaixo, ou um nome novo de pessoa sendo descrito como lead) — algo que realmente aconteceu e deveria virar um registro (contato feito, preferência do cliente, visita agendada, pendência concluída, falta de retorno). Se a mensagem for uma pergunta, um pedido de explicação, uma dúvida genérica, uma saudação, ou qualquer coisa que não cite um fato concreto sobre um lead específico, é "answer" — sem exceção, mesmo que a frase mencione palavras como "aplicativo", "funciona", "ajuda". Na dúvida entre os dois modos, escolha "answer".
 
-1) mode = "action" — quando o corretor está narrando algo que deve ser gravado no CRM (contato com lead, preferência do cliente, follow-up, visita agendada, pendência concluída). Regras de extração:
+Exemplos de mode = "answer": "me diga como esse aplicativo funciona", "oi", "o que você acha desse bairro", "quais as notas da Fernanda", "quem eu preciso enviar opções", qualquer pergunta sobre mercado imobiliário, sobre o próprio Klacer.ia, ou conversa sem um fato novo sobre lead.
+
+Exemplos de mode = "action": "Fernanda é tráfego, procura casa mobiliada", "consegui contato com o João, ele quer visitar sexta às 15h", "enviei as opções pra Maria".
+
+1) mode = "action" — regras de extração quando for mesmo o caso:
    - Tente identificar o lead mencionado usando a lista de leads existentes (nome). Se não tiver certeza, deixe matched_lead_id nulo e preencha lead_name_mentioned com o nome citado.
    - note_text: um resumo fiel do que foi narrado, pra registrar no histórico do lead.
    - tags_to_add / tags_to_remove: etiquetas automáticas, nunca escolhidas manualmente pelo corretor.
@@ -37,7 +41,7 @@ Dois modos possíveis:
    - visit_datetime: ISO 8601 completo (timezone -03:00) SOMENTE quando o corretor afirma ter agendado/marcado uma visita com data e/ou horário específico. Interprete relativo à data de hoje informada abaixo. Caso contrário deixe nulo.
    - reminder_days: número de dias pra um lembrete pontual de cobrança (não relacionado a cadência nem visita), quando pedido explicitamente. Nulo caso contrário.
 
-2) mode = "answer" — em todos os outros casos: perguntas sobre notas/preferências/etiquetas de um lead específico, perguntas sobre quais leads têm determinada etiqueta ou pendência, dúvidas gerais do corretor sobre o mercado imobiliário ou sobre como usar o app, ou apenas conversa. Escreva a resposta final em answer_text, em português, direta e útil — use os dados de leads e notas fornecidos abaixo quando forem relevantes para responder. Se a pergunta não tiver relação com nenhum lead específico, responda com seu conhecimento geral, como um assistente de verdade faria. Mantenha a resposta concisa (a tela é estreita, tipo um app de celular).
+2) mode = "answer" — escreva a resposta final em answer_text, em português, natural e direta, como numa conversa de verdade — use os dados de leads e notas fornecidos abaixo quando forem relevantes. Se a pergunta não tiver relação com nenhum lead específico, responda com seu conhecimento geral. Mantenha a resposta concisa (a tela é estreita, tipo um app de celular).
 
 Sempre responda chamando a ferramenta "respond", nunca em texto livre fora dela.`;
 
@@ -117,16 +121,26 @@ export async function POST(req: NextRequest) {
 
   const response = await anthropic.messages.create({
     model: "claude-sonnet-5",
-    max_tokens: 1024,
+    max_tokens: 2048,
+    thinking: { type: "adaptive" },
+    output_config: { effort: "high" },
     system: `${SYSTEM_PROMPT}\n\nData de hoje: ${today}.\n\nLeads existentes:\n${leadList}\n\nNotas recentes:\n${notesList}`,
     messages: buildMessages(history || [], message),
     tools: [TOOL],
-    tool_choice: { type: "tool", name: "respond" },
+    tool_choice: { type: "auto" },
   });
 
   const toolUse = response.content.find((b) => b.type === "tool_use");
   if (!toolUse || toolUse.type !== "tool_use") {
-    return NextResponse.json({ error: "Não foi possível interpretar a mensagem." }, { status: 502 });
+    // O modelo pode responder em texto puro em vez de chamar a ferramenta
+    // (raro, já que o prompt reforça sempre usar "respond") — trata como
+    // resposta de conversa em vez de quebrar a experiência do corretor.
+    const textBlock = response.content.find((b) => b.type === "text");
+    const fallback: Draft = {
+      mode: "answer",
+      text: textBlock && textBlock.type === "text" ? textBlock.text : "Não consegui formular uma resposta agora.",
+    };
+    return NextResponse.json(fallback);
   }
 
   const input = toolUse.input as {
