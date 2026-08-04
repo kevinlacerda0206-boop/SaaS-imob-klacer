@@ -3,7 +3,7 @@
 import { MessageCircle, Clock, LayoutGrid, Upload, User, Users, LifeBuoy, LogOut, X } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 
-export type ViewId = "conversa" | "atencao" | "funil" | "importar" | "perfil" | "equipe" | "suporte";
+export type ViewId = "conversa" | "atencao" | "funil" | "importar" | "perfil" | "equipe" | "suporte" | "lead";
 
 const MAIN_ITEMS: { id: ViewId; label: string; icon: typeof MessageCircle }[] = [
   { id: "conversa", label: "Conversa", icon: MessageCircle },
@@ -26,6 +26,7 @@ export function NavDrawer({
   attentionBadge,
   onLogout,
   isGuest,
+  isDesktop,
 }: {
   open: boolean;
   onClose: () => void;
@@ -34,8 +35,11 @@ export function NavDrawer({
   attentionBadge: number;
   onLogout: () => void;
   isGuest: boolean;
+  isDesktop: boolean;
 }) {
   const { colors } = useTheme();
+
+  const isActive = (id: ViewId) => view === id || (id === "funil" && view === "lead");
 
   const itemStyle = (active: boolean) => ({
     display: "flex" as const,
@@ -53,6 +57,99 @@ export function NavDrawer({
     textAlign: "left" as const,
     position: "relative" as const,
   });
+
+  const asideContent = (
+    <>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22, paddingLeft: 6 }}>
+        <span style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: 14, letterSpacing: 0.2, color: colors.ink }}>KLACER.IA</span>
+        {!isDesktop && (
+          <button onClick={onClose} style={{ background: "none", border: "none", color: colors.muted, cursor: "pointer", display: "flex" }} aria-label="Fechar menu">
+            <X size={18} />
+          </button>
+        )}
+      </div>
+
+      <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        {MAIN_ITEMS.map((item) => (
+          <button key={item.id} onClick={() => onNavigate(item.id)} style={itemStyle(isActive(item.id))}>
+            <item.icon size={17} />
+            {item.label}
+            {item.id === "atencao" && attentionBadge > 0 && (
+              <span
+                style={{
+                  marginLeft: "auto",
+                  background: colors.urgent,
+                  color: "#fff",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  borderRadius: 10,
+                  padding: "1px 7px",
+                }}
+              >
+                {attentionBadge}
+              </span>
+            )}
+          </button>
+        ))}
+      </nav>
+
+      <div style={{ height: 1, background: colors.border, margin: "14px 6px" }} />
+
+      <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        {ACCOUNT_ITEMS.map((item) => (
+          <button key={item.id} onClick={() => onNavigate(item.id)} style={itemStyle(isActive(item.id))}>
+            <item.icon size={17} />
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
+      <div style={{ flex: 1 }} />
+
+      <button
+        onClick={onLogout}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "10px 10px",
+          borderRadius: 8,
+          border: "none",
+          background: "transparent",
+          color: colors.muted,
+          fontSize: 14,
+          fontFamily: "'Archivo', sans-serif",
+          cursor: "pointer",
+          textAlign: "left",
+        }}
+      >
+        <LogOut size={17} />
+        {isGuest ? "Sair (perde dados de convidado)" : "Sair"}
+      </button>
+    </>
+  );
+
+  if (isDesktop) {
+    return (
+      <aside
+        style={{
+          position: "sticky",
+          top: 0,
+          height: "100vh",
+          width: 260,
+          flexShrink: 0,
+          background: colors.panel,
+          borderRight: `1px solid ${colors.border}`,
+          display: "flex",
+          flexDirection: "column",
+          padding: "18px 14px",
+          overflowY: "auto",
+        }}
+      >
+        {asideContent}
+      </aside>
+    );
+  }
 
   return (
     <>
@@ -86,70 +183,7 @@ export function NavDrawer({
           overflowY: "auto",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22, paddingLeft: 6 }}>
-          <span style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: 14, letterSpacing: 0.2, color: colors.ink }}>KLACER.IA</span>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: colors.muted, cursor: "pointer", display: "flex" }} aria-label="Fechar menu">
-            <X size={18} />
-          </button>
-        </div>
-
-        <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {MAIN_ITEMS.map((item) => (
-            <button key={item.id} onClick={() => onNavigate(item.id)} style={itemStyle(view === item.id)}>
-              <item.icon size={17} />
-              {item.label}
-              {item.id === "atencao" && attentionBadge > 0 && (
-                <span
-                  style={{
-                    marginLeft: "auto",
-                    background: colors.urgent,
-                    color: "#fff",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    borderRadius: 10,
-                    padding: "1px 7px",
-                  }}
-                >
-                  {attentionBadge}
-                </span>
-              )}
-            </button>
-          ))}
-        </nav>
-
-        <div style={{ height: 1, background: colors.border, margin: "14px 6px" }} />
-
-        <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {ACCOUNT_ITEMS.map((item) => (
-            <button key={item.id} onClick={() => onNavigate(item.id)} style={itemStyle(view === item.id)}>
-              <item.icon size={17} />
-              {item.label}
-            </button>
-          ))}
-        </nav>
-
-        <div style={{ flex: 1 }} />
-
-        <button
-          onClick={onLogout}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "10px 10px",
-            borderRadius: 8,
-            border: "none",
-            background: "transparent",
-            color: colors.muted,
-            fontSize: 14,
-            fontFamily: "'Archivo', sans-serif",
-            cursor: "pointer",
-            textAlign: "left",
-          }}
-        >
-          <LogOut size={17} />
-          {isGuest ? "Sair (perde dados de convidado)" : "Sair"}
-        </button>
+        {asideContent}
       </aside>
     </>
   );

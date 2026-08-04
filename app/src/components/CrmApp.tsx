@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Mic, Send, Check, Clock, ChevronRight, Menu } from "lucide-react";
+import { Mic, Send, Check, Clock, ChevronRight, Menu, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { STAGES, CADENCE_DAYS } from "@/lib/colors";
 import { uid, fmtDate, fmtTime, daysFromNow, extractIntent } from "@/lib/intent";
+import { useIsDesktop } from "@/lib/useIsDesktop";
 import type { Lead, Note, Reminder, ChatMessage, WriteDraft, ConfirmPayload } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { leadFromRow, noteFromRow, reminderFromRow } from "@/lib/supabase/mappers";
@@ -17,6 +18,7 @@ import { ProfileView } from "./ProfileView";
 import { TeamView } from "./TeamView";
 import { SupportView } from "./SupportView";
 import { ImportView } from "./ImportView";
+import { LeadDetailView } from "./LeadDetailView";
 
 const TITLES: Record<ViewId, string> = {
   conversa: "Conversa",
@@ -26,7 +28,19 @@ const TITLES: Record<ViewId, string> = {
   perfil: "Perfil",
   equipe: "Equipe",
   suporte: "Suporte",
+  lead: "",
 };
+
+// Troca de tela com um fade suave via View Transitions API do navegador —
+// sem dependência nova; navegadores sem suporte só trocam na hora, sem erro.
+function withViewTransition(apply: () => void) {
+  const doc = document as Document & { startViewTransition?: (cb: () => void) => void };
+  if (typeof doc.startViewTransition === "function") {
+    doc.startViewTransition(apply);
+  } else {
+    apply();
+  }
+}
 
 export default function CrmApp({
   initialLeads,
@@ -93,9 +107,20 @@ export default function CrmApp({
     supabase.auth.getUser().then(({ data }) => setIsGuest(!!data.user?.is_anonymous));
   }, [supabase]);
 
+  const isDesktop = useIsDesktop();
+
   const navigate = (v: ViewId) => {
-    setView(v);
-    setMenuOpen(false);
+    withViewTransition(() => {
+      setView(v);
+      setMenuOpen(false);
+    });
+  };
+
+  const openLead = (leadId: string) => {
+    withViewTransition(() => {
+      setSelectedLead(leadId);
+      setView("lead");
+    });
   };
 
   const refreshData = async () => {
@@ -239,6 +264,8 @@ export default function CrmApp({
   const upcomingVisits = reminders.filter((r) => !r.done && r.kind === "visita").sort((a, b) => a.dueAt - b.dueAt);
   const todayList = [...todayFollowups, ...upcomingVisits.filter((r) => r.dueAt <= Date.now() + 86400000)];
 
+  const headerTitle = view === "lead" ? leads.find((l) => l.id === selectedLead)?.name || "Lead" : TITLES[view];
+
   return (
     <div
       style={{
@@ -247,10 +274,6 @@ export default function CrmApp({
         color: COLORS.ink,
         minHeight: "100vh",
         display: "flex",
-        flexDirection: "column",
-        maxWidth: 480,
-        margin: "0 auto",
-        position: "relative",
       }}
     >
       <NavDrawer
@@ -261,28 +284,65 @@ export default function CrmApp({
         attentionBadge={todayList.length}
         onLogout={handleLogout}
         isGuest={isGuest}
+        isDesktop={isDesktop}
       />
 
-      <header style={{ padding: "16px 16px 14px", borderBottom: `1px solid ${COLORS.border}` }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button
-              onClick={() => setMenuOpen(true)}
-              style={{ background: "none", border: "none", color: COLORS.ink, cursor: "pointer", display: "flex", padding: 4 }}
-              aria-label="Abrir menu"
+      <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center" }}>
+        <div
+          style={{
+            width: "100%",
+            maxWidth: isDesktop ? 720 : 480,
+            display: "flex",
+            flexDirection: "column",
+            minHeight: "100vh",
+          }}
+        >
+          <header
+            style={{
+              padding: "14px 16px",
+              borderBottom: `1px solid ${COLORS.border}`,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            {view === "lead" ? (
+              <button
+                onClick={() => navigate("funil")}
+                style={{ background: "none", border: "none", color: COLORS.ink, cursor: "pointer", display: "flex", padding: 4, flexShrink: 0 }}
+                aria-label="Voltar pro funil"
+              >
+                <ArrowLeft size={20} />
+              </button>
+            ) : (
+              !isDesktop && (
+                <button
+                  onClick={() => setMenuOpen(true)}
+                  style={{ background: "none", border: "none", color: COLORS.ink, cursor: "pointer", display: "flex", padding: 4, flexShrink: 0 }}
+                  aria-label="Abrir menu"
+                >
+                  <Menu size={20} />
+                </button>
+              )
+            )}
+            <h1
+              style={{
+                flex: 1,
+                fontFamily: "'Archivo', sans-serif",
+                fontWeight: 600,
+                fontSize: 16,
+                margin: 0,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
             >
-              <Menu size={20} />
-            </button>
-            <span style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: 15, letterSpacing: 0.2 }}>KLACER.IA</span>
-          </div>
-          <ThemeToggle />
-        </div>
-        <h1 style={{ fontFamily: "'Archivo Black', sans-serif", fontWeight: 400, fontSize: 22, margin: 0, letterSpacing: -0.2 }}>
-          {TITLES[view]}
-        </h1>
-      </header>
+              {headerTitle}
+            </h1>
+            <ThemeToggle />
+          </header>
 
-      <main style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+          <main style={{ flex: 1, overflowY: "auto", padding: 16 }}>
         {view === "conversa" && (
           <div style={{ display: "flex", flexDirection: "column" }}>
             {chatLog.length === 0 && !draft && (
@@ -446,7 +506,7 @@ export default function CrmApp({
                     {stageLeads.map((lead) => (
                       <div
                         key={lead.id}
-                        onClick={() => setSelectedLead(lead.id === selectedLead ? null : lead.id)}
+                        onClick={() => openLead(lead.id)}
                         style={{ background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: 12, cursor: "pointer" }}
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -461,44 +521,8 @@ export default function CrmApp({
                               </div>
                             )}
                           </div>
-                          <ChevronRight
-                            size={16}
-                            color={COLORS.muted}
-                            style={{ transform: selectedLead === lead.id ? "rotate(90deg)" : "none", transition: "transform .15s" }}
-                          />
+                          <ChevronRight size={16} color={COLORS.muted} />
                         </div>
-
-                        {selectedLead === lead.id && (
-                          <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${COLORS.border}` }} onClick={(e) => e.stopPropagation()}>
-                            <select
-                              value={lead.stage}
-                              onChange={(e) => changeStage(lead.id, e.target.value as Lead["stage"])}
-                              style={{ ...inputStyle, width: "100%", marginBottom: 10 }}
-                            >
-                              {STAGES.map((s) => (
-                                <option key={s.id} value={s.id}>
-                                  {s.label}
-                                </option>
-                              ))}
-                            </select>
-                            <div style={{ fontFamily: "'Roboto Mono', monospace", fontSize: 10.5, color: COLORS.muted, textTransform: "uppercase", marginBottom: 6 }}>
-                              Histórico e notas
-                            </div>
-                            {notes.filter((n) => n.leadId === lead.id).length === 0 && (
-                              <div style={{ fontSize: 13, color: COLORS.muted }}>Nenhum registro ainda.</div>
-                            )}
-                            {notes
-                              .filter((n) => n.leadId === lead.id)
-                              .slice()
-                              .reverse()
-                              .map((n) => (
-                                <div key={n.id} style={{ fontSize: 13, padding: "6px 0", borderBottom: `1px solid ${COLORS.border}` }}>
-                                  <span style={{ color: COLORS.muted, fontSize: 11.5, fontFamily: "'Roboto Mono', monospace" }}>{fmtDate(n.createdAt)} — </span>
-                                  {n.text}
-                                </div>
-                              ))}
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -508,35 +532,43 @@ export default function CrmApp({
           </div>
         )}
 
+        {view === "lead" &&
+          (() => {
+            const lead = leads.find((l) => l.id === selectedLead);
+            return lead ? <LeadDetailView lead={lead} notes={notes} onChangeStage={changeStage} /> : null;
+          })()}
+
         {view === "importar" && <ImportView onImported={refreshData} />}
         {view === "perfil" && <ProfileView />}
         {view === "equipe" && <TeamView />}
         {view === "suporte" && <SupportView />}
-      </main>
+          </main>
 
-      {view === "conversa" && (
-        <div style={{ padding: "10px 16px 16px" }}>
-          <div style={{ display: "flex", gap: 8, background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 24, padding: "6px 6px 6px 16px", alignItems: "center" }}>
-            <button style={{ background: "none", border: "none", color: COLORS.accent, display: "flex", cursor: "pointer" }} title="Entrada por voz (ainda não implementada)">
-              <Mic size={18} />
-            </button>
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              placeholder="Digite o que aconteceu ou pergunte algo…"
-              style={{ flex: 1, border: "none", outline: "none", fontSize: 14, fontFamily: "'Archivo', sans-serif", background: "transparent", color: COLORS.ink }}
-            />
-            <button
-              onClick={handleSend}
-              disabled={processing || !input.trim()}
-              style={{ ...btnBase, borderRadius: "50%", width: 34, height: 34, padding: 0, background: COLORS.accent, color: COLORS.onAccent, opacity: processing || !input.trim() ? 0.5 : 1 }}
-            >
-              <Send size={14} />
-            </button>
-          </div>
+          {view === "conversa" && (
+            <div style={{ padding: "10px 16px 16px" }}>
+              <div style={{ display: "flex", gap: 8, background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 24, padding: "6px 6px 6px 16px", alignItems: "center" }}>
+                <button style={{ background: "none", border: "none", color: COLORS.accent, display: "flex", cursor: "pointer" }} title="Entrada por voz (ainda não implementada)">
+                  <Mic size={18} />
+                </button>
+                <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                  placeholder="Digite o que aconteceu ou pergunte algo…"
+                  style={{ flex: 1, border: "none", outline: "none", fontSize: 14, fontFamily: "'Archivo', sans-serif", background: "transparent", color: COLORS.ink }}
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={processing || !input.trim()}
+                  style={{ ...btnBase, borderRadius: "50%", width: 34, height: 34, padding: 0, background: COLORS.accent, color: COLORS.onAccent, opacity: processing || !input.trim() ? 0.5 : 1 }}
+                >
+                  <Send size={14} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
