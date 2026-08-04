@@ -2,6 +2,11 @@
 
 > Este documento resume tudo que foi validado num processo de brainstorm e prototipagem, pronto pra ser usado como instrução inicial numa sessão de desenvolvimento real.
 
+## Padrão de qualidade esperado
+Este não é um projeto interno ou uma prova de conceito descartável — é um produto que será lançado comercialmente. Toda tela precisa ter acabamento de produto real: visual cuidado, interações fluidas, identidade própria e marcante (não um layout genérico de SaaS). A referência de experiência é o nível de polimento de ferramentas como Claude e ChatGPT — clareza, poucos elementos na tela, hierarquia visual óbvia, transições suaves — mas com identidade visual própria, voltada ao mercado imobiliário de alto padrão, não uma cópia do visual dessas ferramentas.
+
+> ⚠️ **Ponto em aberto**: essa seção fala em identidade "voltada ao mercado imobiliário de alto padrão", mas a seção de Público do MVP (abaixo) diz explicitamente "qualquer nicho, não só alto padrão". A marca Klacer.ia foi desenhada com essa segunda instrução em mente (paleta/tipografia neutras, não exclusivamente premium). Precisa alinhar qual das duas vale — ver conversa mais recente.
+
 ## Hipótese central a validar
 Se o corretor conseguir atualizar o CRM inteiro conversando (por voz ou texto) em uma janela nativa do app — sem preencher formulário — ele vai usar isso todo dia, e vai perder menos negócio por falta de retorno a lead ou proprietário.
 
@@ -10,10 +15,14 @@ Tudo no MVP existe para provar (ou derrubar) essa hipótese o mais rápido poss�
 ## Público do MVP
 Corretor de imóveis em geral — qualquer nicho do mercado imobiliário (residencial, comercial, rural, locação, lançamento etc.), não só alto padrão. Foco do produto é o corretor individual e o dia a dia dele; funcionalidades de gestor/diretor/construtora ficam pra depois. Equipe pequena como ambiente ideal de teste inicial (o ambiente ideal de teste é a própria equipe do usuário), com um só nível hierárquico por enquanto: corretor + um gestor observando o time.
 
+Público-alvo comercial do primeiro momento: o corretor individual sobrecarregado de tarefas, que não consegue dar conta de tudo sozinho — não a imobiliária grande, que fica para uma fase posterior.
+
 ---
 
 ## Decisão de UX que define o produto
 **A tela inicial do app é a conversa, não o CRM.** O corretor abre o app e já está numa janela de chat — como conversar com um assistente. O funil de leads e a lista de pendências existem, mas são destinos que ele visita, não a porta de entrada. Essa inversão (conversa é o principal, dados estruturados são o apoio) é a tese central do produto.
+
+**Restrição de produto importante:** o app nunca entra em contato com o cliente automaticamente. Ele só dá o lembrete de que é dia de fazer follow-up com determinado cliente, podendo sugerir mensagens (com base no histórico registrado pelo corretor sobre aquele cliente) — mas o envio em si é sempre manual, feito pelo corretor.
 
 ---
 
@@ -55,6 +64,10 @@ Quando o corretor narra que agendou uma visita com data/horário (ex: "agendei v
 ### 7. Motor de cadência
 - Lead sem interação há X dias, ou marcado como "sem retorno", entra numa cadência automática de lembretes (ex: 3, 5, 7 e 30 dias) — sem o corretor precisar criar cada lembrete manualmente
 - Tudo isso aparece numa lista "precisa de atenção hoje / atrasado"
+- A cadência recomendada varia por segmento de mercado:
+  - **Econômico/MCMV**: acompanha os marcos do processo de financiamento (documentação, análise de crédito), não só dias corridos
+  - **Lançamentos**: cadência decrescente — diária na 1ª semana, semanal no 2º mês, quinzenal depois
+  - **Alto padrão**: cadência mais espaçada, mas cada contato precisa entregar valor substancial — relacionamento pesa mais que frequência
 
 ### 8. Scripts de reativação
 Biblioteca simples de scripts por tempo de inatividade, vinculada à lista de atenção.
@@ -62,6 +75,14 @@ Biblioteca simples de scripts por tempo de inatividade, vinculada à lista de at
 ### 9. Dashboard do gestor (mínimo)
 - Lista de leads por corretor
 - Quem está com follow-up atrasado
+
+### 10. Importação em massa de leads (via menu, canto superior esquerdo)
+Pensada para corretores migrando de outra ferramenta ou de uma planilha própria, com uma base já formada (pode chegar a centenas de leads de uma vez). Fluxo:
+1. **Upload** — aceitar `.csv` e `.xlsx`
+2. **Mapeamento de colunas** — o app tenta reconhecer automaticamente qual coluna da planilha corresponde a nome, telefone, tipo de busca (compra/locação), imóvel de interesse e última data de contato; corretor confirma ou ajusta o mapeamento manualmente antes de prosseguir
+3. **Pré-visualização** — mostrar uma amostra (5-10 linhas) já mapeada antes da confirmação final
+4. **Checagem de duplicados** — se telefone (ou nome+telefone) já existir na base, perguntar se deve atualizar o lead existente ou ignorar a linha
+5. **Pós-importação** — a "última data de contato" de cada lead importado deve alimentar o motor de cadência imediatamente, populando a lista de atenção com quem já está atrasado, sem exigir nenhuma ação adicional do corretor
 
 ---
 
@@ -86,6 +107,7 @@ Validar o núcleo (conversa → CRM → cadência → agenda) antes de qualquer 
 4. Ficha do lead (histórico, notas, etiquetas)
 5. Lista de atenção: "hoje/atrasado" + "próximos compromissos" (visitas)
 6. Dashboard do gestor
+7. Importação em massa de leads (CSV/XLSX)
 
 ---
 
