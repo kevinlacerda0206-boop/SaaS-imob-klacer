@@ -317,6 +317,9 @@ export default function CrmApp({
     .sort((a, b) => a.dueAt - b.dueAt);
   const upcomingVisits = reminders.filter((r) => !r.done && r.kind === "visita").sort((a, b) => a.dueAt - b.dueAt);
   const todayList = [...todayFollowups, ...upcomingVisits.filter((r) => r.dueAt <= Date.now() + 86400000)];
+  const unattendedLeads = leads
+    .filter((l) => l.stage === "novo" && !notes.some((n) => n.leadId === l.id))
+    .sort((a, b) => a.createdAt - b.createdAt);
 
   const headerTitle = view === "lead" ? leads.find((l) => l.id === selectedLead)?.name || "Lead" : TITLES[view];
 
@@ -335,7 +338,7 @@ export default function CrmApp({
         onClose={() => setMenuOpen(false)}
         view={view}
         onNavigate={navigate}
-        attentionBadge={todayList.length}
+        attentionBadge={todayList.length + unattendedLeads.length}
         onLogout={handleLogout}
         isGuest={isGuest}
         isDesktop={isDesktop}
@@ -452,6 +455,36 @@ export default function CrmApp({
 
         {view === "atencao" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            {unattendedLeads.length > 0 && (
+              <div>
+                <div style={{ fontFamily: "'Roboto Mono', monospace", fontSize: 11, color: COLORS.urgent, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
+                  Atendimento urgente · primeiro contato
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {unattendedLeads.map((l) => (
+                    <div
+                      key={l.id}
+                      style={{ background: COLORS.urgentSoft, border: `1px solid ${COLORS.urgent}`, borderRadius: 6, padding: 12, display: "flex", gap: 10, alignItems: "flex-start" }}
+                    >
+                      <Clock size={16} color={COLORS.urgent} style={{ marginTop: 2, flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: COLORS.urgent }}>{l.name}</div>
+                        <div style={{ fontSize: 13, color: COLORS.inkSoft, margin: "2px 0 4px" }}>
+                          {l.property || l.tags[0] || "Lead novo"} — ainda sem primeiro contato
+                        </div>
+                        <div style={{ fontSize: 11.5, fontFamily: "'Roboto Mono', monospace", color: COLORS.urgent }}>
+                          Recebido {fmtDate(l.createdAt)}
+                        </div>
+                      </div>
+                      <button onClick={() => openLead(l.id)} style={{ ...btnBase, background: COLORS.urgent, color: "#fff", padding: "6px 10px" }}>
+                        Atender
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div>
               <div style={{ fontFamily: "'Roboto Mono', monospace", fontSize: 11, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
                 Hoje e atrasados
