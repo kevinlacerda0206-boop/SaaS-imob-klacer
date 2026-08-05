@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Mic, Send, Check, Clock, ChevronRight, Menu, ArrowLeft } from "lucide-react";
+import { Mic, Square, Send, Check, Clock, ChevronRight, Menu, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { STAGES, CADENCE_DAYS } from "@/lib/colors";
 import { uid, fmtDate, fmtTime, daysFromNow, extractIntent } from "@/lib/intent";
@@ -30,6 +30,29 @@ const TITLES: Record<ViewId, string> = {
   suporte: "Suporte",
   lead: "",
 };
+
+// Tipos mínimos da Web Speech API (não faz parte do lib.dom.d.ts padrão).
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  [index: number]: { transcript: string };
+}
+interface SpeechRecognitionResultList {
+  length: number;
+  [index: number]: SpeechRecognitionResult;
+}
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+}
+interface SpeechRecognitionInstance extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult: ((e: SpeechRecognitionEvent) => void) | null;
+  onerror: ((e: Event) => void) | null;
+  onend: (() => void) | null;
+}
 
 // Troca de tela com um fade suave via View Transitions API do navegador —
 // sem dependência nova; navegadores sem suporte só trocam na hora, sem erro.
@@ -76,6 +99,7 @@ export default function CrmApp({
   const logEndRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
   const inputStyle = {
     border: `1px solid ${COLORS.border}`,
@@ -201,8 +225,43 @@ export default function CrmApp({
     }
   };
 
-  const startRecording = async () => {
-    setErrorMsg("");
+  const getSpeechRecognitionCtor = () => {
+    const w = window as unknown as {
+      SpeechRecognition?: new () => SpeechRecognitionInstance;
+      webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
+    };
+    return w.SpeechRecognition || w.webkitSpeechRecognition || null;
+  };
+
+  const startLiveDictation = (Ctor: new () => SpeechRecognitionInstance) => {
+    const baseInput = input.trim();
+    const recognition = new Ctor();
+    recognition.lang = "pt-BR";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.onresult = (e) => {
+      let finalText = "";
+      let interimText = "";
+      for (let i = 0; i < e.results.length; i++) {
+        const result = e.results[i];
+        if (result.isFinal) finalText += result[0].transcript;
+        else interimText += result[0].transcript;
+      }
+      const spoken = (finalText + " " + interimText).trim();
+      setInput(baseInput ? `${baseInput} ${spoken}` : spoken);
+    };
+    recognition.onerror = () => {
+      setErrorMsg("Não consegui acessar o microfone. Verifique a permissão do navegador.");
+      setRecording(false);
+    };
+    recognition.onend = () => setRecording(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setRecording(true);
+  };
+
+  const startFallbackRecording = async () => {
+    const baseInput = input.trim();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
@@ -223,7 +282,7 @@ export default function CrmApp({
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "Falha na transcrição.");
           if (data.text) {
-            await handleSend(data.text);
+            setInput(baseInput ? `${baseInput} ${data.text}` : data.text);
           } else {
             setErrorMsg("Não entendi nada no áudio. Tente novamente.");
           }
@@ -241,7 +300,15 @@ export default function CrmApp({
     }
   };
 
+  const startRecording = () => {
+    setErrorMsg("");
+    const Ctor = getSpeechRecognitionCtor();
+    if (Ctor) startLiveDictation(Ctor);
+    else startFallbackRecording();
+  };
+
   const stopRecording = () => {
+    recognitionRef.current?.stop();
     mediaRecorderRef.current?.stop();
     setRecording(false);
   };
@@ -424,25 +491,46 @@ export default function CrmApp({
               <div
                 key={m.id}
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "46px 1fr",
-                  gap: 10,
-                  padding: "9px 0",
-                  fontSize: 13.5,
-                  lineHeight: 1.5,
-                  borderLeft: m.role === "user" ? `2px solid ${COLORS.accent}` : "2px solid transparent",
-                  paddingLeft: m.role === "user" ? 10 : 0,
-                  marginLeft: m.role === "user" ? -2 : 0,
-                  color: m.role === "user" ? COLORS.ink : COLORS.inkSoft,
+                  display: "flex",
+                  justifyContent: m.role === "user" ? "flex-end" : "flex-start",
+                  padding: "5px 0",
                 }}
               >
-                <span style={{ fontFamily: "'Roboto Mono', monospace", fontSize: 10.5, color: COLORS.muted, paddingTop: 2 }}>
-                  {m.role === "system" ? "→" : m.time}
-                </span>
-                <span style={{ whiteSpace: "pre-line" }}>{m.text}</span>
+                <div
+                  style={{
+                    maxWidth: "82%",
+                    background: m.role === "user" ? COLORS.accentSoft : "transparent",
+                    color: m.role === "user" ? COLORS.ink : COLORS.inkSoft,
+                    borderRadius: m.role === "user" ? 18 : 0,
+                    padding: m.role === "user" ? "10px 15px" : "4px 0",
+                    fontSize: 14.5,
+                    lineHeight: 1.55,
+                    whiteSpace: "pre-line",
+                  }}
+                >
+                  {m.text}
+                </div>
               </div>
             ))}
-            {processing && <div style={{ fontSize: 13, color: COLORS.muted, fontStyle: "italic", padding: "9px 0" }}>interpretando…</div>}
+            {processing && (
+              <div style={{ display: "flex", justifyContent: "flex-start", padding: "4px 0" }}>
+                <div style={{ display: "flex", gap: 4, padding: "6px 0" }}>
+                  {[0, 1, 2].map((i) => (
+                    <span
+                      key={i}
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: COLORS.muted,
+                        animation: `bounceDot 1.1s ${i * 0.15}s infinite ease-in-out`,
+                      }}
+                    />
+                  ))}
+                </div>
+                <style>{`@keyframes bounceDot { 0%,80%,100% { opacity: 0.3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }`}</style>
+              </div>
+            )}
             {errorMsg && <div style={{ fontSize: 13, color: COLORS.urgent, padding: "9px 0" }}>{errorMsg}</div>}
             {draft && (
               <div style={{ paddingTop: 6 }}>
@@ -637,7 +725,7 @@ export default function CrmApp({
                 <button
                   onClick={toggleRecording}
                   disabled={transcribing || processing}
-                  title={recording ? "Parar gravação" : "Gravar mensagem de voz"}
+                  title={recording ? "Parar gravação" : "Ditar mensagem por voz"}
                   style={{
                     background: recording ? COLORS.urgent : "none",
                     border: "none",
@@ -651,22 +739,23 @@ export default function CrmApp({
                     cursor: transcribing || processing ? "default" : "pointer",
                     opacity: transcribing ? 0.5 : 1,
                     animation: recording ? "pulse 1.2s ease-in-out infinite" : "none",
+                    flexShrink: 0,
                   }}
                 >
-                  <Mic size={18} />
+                  {recording ? <Square size={14} fill="currentColor" /> : <Mic size={18} />}
                 </button>
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                  placeholder={transcribing ? "Transcrevendo áudio…" : recording ? "Gravando… toque no microfone para parar" : "Digite o que aconteceu ou pergunte algo…"}
-                  disabled={recording || transcribing}
+                  placeholder={transcribing ? "Transcrevendo áudio…" : recording ? "Ouvindo…" : "Digite o que aconteceu ou pergunte algo…"}
+                  disabled={transcribing}
                   style={{ flex: 1, border: "none", outline: "none", fontSize: 14, fontFamily: "'Archivo', sans-serif", background: "transparent", color: COLORS.ink }}
                 />
                 <button
                   onClick={() => handleSend()}
-                  disabled={processing || !input.trim() || recording || transcribing}
-                  style={{ ...btnBase, borderRadius: "50%", width: 34, height: 34, padding: 0, background: COLORS.accent, color: COLORS.onAccent, opacity: processing || !input.trim() || recording || transcribing ? 0.5 : 1 }}
+                  disabled={processing || !input.trim() || transcribing}
+                  style={{ ...btnBase, borderRadius: "50%", width: 34, height: 34, padding: 0, background: COLORS.accent, color: COLORS.onAccent, opacity: processing || !input.trim() || transcribing ? 0.5 : 1 }}
                 >
                   <Send size={14} />
                 </button>
