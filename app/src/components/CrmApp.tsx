@@ -207,6 +207,7 @@ export default function CrmApp({
   const handleSend = async (overrideText?: string) => {
     const message = (overrideText ?? input).trim();
     if (!message || processing) return;
+    if (recording) stopRecording();
     setChatLog((prev) => [...prev, { role: "user", text: message, id: uid("m"), time: fmtTime(Date.now()) }]);
     if (overrideText === undefined) setInput("");
     setProcessing(true);
