@@ -71,7 +71,11 @@ export default function CrmApp({
   const [draft, setDraft] = useState<WriteDraft | null>(null);
   const [processing, setProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const logEndRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const inputStyle = {
     border: `1px solid ${COLORS.border}`,
@@ -176,11 +180,11 @@ export default function CrmApp({
     setShowNewLead(false);
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || processing) return;
-    const message = input.trim();
+  const handleSend = async (overrideText?: string) => {
+    const message = (overrideText ?? input).trim();
+    if (!message || processing) return;
     setChatLog((prev) => [...prev, { role: "user", text: message, id: uid("m"), time: fmtTime(Date.now()) }]);
-    setInput("");
+    if (overrideText === undefined) setInput("");
     setProcessing(true);
     setErrorMsg("");
     try {
@@ -195,6 +199,56 @@ export default function CrmApp({
     } finally {
       setProcessing(false);
     }
+  };
+
+  const startRecording = async () => {
+    setErrorMsg("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        if (blob.size === 0) return;
+        setTranscribing(true);
+        try {
+          const form = new FormData();
+          form.append("audio", blob, "gravacao.webm");
+          const res = await fetch("/api/transcribe", { method: "POST", body: form });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Falha na transcrição.");
+          if (data.text) {
+            await handleSend(data.text);
+          } else {
+            setErrorMsg("Não entendi nada no áudio. Tente novamente.");
+          }
+        } catch (e) {
+          setErrorMsg(e instanceof Error ? e.message : "Falha na transcrição.");
+        } finally {
+          setTranscribing(false);
+        }
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setRecording(true);
+    } catch {
+      setErrorMsg("Não consegui acessar o microfone. Verifique a permissão do navegador.");
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setRecording(false);
+  };
+
+  const toggleRecording = () => {
+    if (recording) stopRecording();
+    else startRecording();
   };
 
   const confirmDraft = async ({ leadId, noteText, tagsToAdd, tagsToRemove, reminder, cadence, visit }: ConfirmPayload) => {
@@ -547,24 +601,44 @@ export default function CrmApp({
           {view === "conversa" && (
             <div style={{ padding: "10px 16px 16px" }}>
               <div style={{ display: "flex", gap: 8, background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 24, padding: "6px 6px 6px 16px", alignItems: "center" }}>
-                <button style={{ background: "none", border: "none", color: COLORS.accent, display: "flex", cursor: "pointer" }} title="Entrada por voz (ainda não implementada)">
+                <button
+                  onClick={toggleRecording}
+                  disabled={transcribing || processing}
+                  title={recording ? "Parar gravação" : "Gravar mensagem de voz"}
+                  style={{
+                    background: recording ? COLORS.urgent : "none",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: 30,
+                    height: 30,
+                    color: recording ? "#fff" : COLORS.accent,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: transcribing || processing ? "default" : "pointer",
+                    opacity: transcribing ? 0.5 : 1,
+                    animation: recording ? "pulse 1.2s ease-in-out infinite" : "none",
+                  }}
+                >
                   <Mic size={18} />
                 </button>
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                  placeholder="Digite o que aconteceu ou pergunte algo…"
+                  placeholder={transcribing ? "Transcrevendo áudio…" : recording ? "Gravando… toque no microfone para parar" : "Digite o que aconteceu ou pergunte algo…"}
+                  disabled={recording || transcribing}
                   style={{ flex: 1, border: "none", outline: "none", fontSize: 14, fontFamily: "'Archivo', sans-serif", background: "transparent", color: COLORS.ink }}
                 />
                 <button
-                  onClick={handleSend}
-                  disabled={processing || !input.trim()}
-                  style={{ ...btnBase, borderRadius: "50%", width: 34, height: 34, padding: 0, background: COLORS.accent, color: COLORS.onAccent, opacity: processing || !input.trim() ? 0.5 : 1 }}
+                  onClick={() => handleSend()}
+                  disabled={processing || !input.trim() || recording || transcribing}
+                  style={{ ...btnBase, borderRadius: "50%", width: 34, height: 34, padding: 0, background: COLORS.accent, color: COLORS.onAccent, opacity: processing || !input.trim() || recording || transcribing ? 0.5 : 1 }}
                 >
                   <Send size={14} />
                 </button>
               </div>
+              <style>{`@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }`}</style>
             </div>
           )}
         </div>
